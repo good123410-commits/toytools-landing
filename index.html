@@ -49,7 +49,7 @@
   <!-- ═══════════════════ HEADER ═══════════════════ -->
   <header class="sticky top-0 z-50 border-b-4 border-toy-brown bg-toy-yellow/95 backdrop-blur-sm shadow-[0_4px_0_#5D4037]">
     <div class="max-w-7xl mx-auto px-4 sm:px-6">
-      <div class="flex items-center justify-between h-16 sm:h-18">
+      <div class="flex items-center justify-between gap-2 h-16 sm:h-18 flex-wrap sm:flex-nowrap">
         <!-- Logo -->
         <a href="#home" class="nav-link flex items-center gap-2 group" data-section="home">
           <span class="text-3xl sm:text-4xl group-hover:animate-wiggle inline-block">🧸</span>
@@ -60,26 +60,52 @@
         </a>
 
         <!-- Desktop Nav -->
-        <nav class="hidden md:flex items-center gap-1">
+        <nav class="hidden lg:flex items-center gap-1">
           <a href="#toys" class="nav-link nav-pill" data-section="toys">장난감 소개</a>
           <a href="#devlog" class="nav-link nav-pill" data-section="devlog">개발일지</a>
           <a href="#board" class="nav-link nav-pill" data-section="board">자유게시판</a>
           <a href="#skins" class="nav-link nav-pill" data-section="skins">스킨 마켓</a>
+          <a href="#admin" id="admin-nav-link" class="nav-link nav-pill admin-pill hidden" data-section="admin">👑 관리자</a>
         </nav>
 
+        <!-- Auth Area (Desktop) -->
+        <div id="auth-guest" class="hidden md:flex items-center gap-2 ml-2">
+          <button id="btn-login" class="auth-btn auth-btn-outline">로그인</button>
+          <button id="btn-signup" class="auth-btn auth-btn-primary">회원가입</button>
+        </div>
+        <div id="auth-user" class="hidden md:flex items-center gap-2 ml-2 text-sm">
+          <span class="auth-user-nick font-bold text-toy-brown" id="header-nickname">닉네임</span>
+          <span class="auth-cash-badge" id="header-cash">💰 0P</span>
+          <button id="btn-mypage" class="auth-btn auth-btn-outline auth-btn-sm">마이페이지</button>
+          <button id="btn-logout" class="auth-btn auth-btn-ghost auth-btn-sm">로그아웃</button>
+        </div>
+
         <!-- Mobile menu button -->
-        <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg border-3 border-toy-brown bg-white shadow-toy-sm hover:bg-toy-pink/20 transition-colors" aria-label="메뉴 열기">
+        <button id="mobile-menu-btn" class="lg:hidden p-2 rounded-lg border-3 border-toy-brown bg-white shadow-toy-sm hover:bg-toy-pink/20 transition-colors" aria-label="메뉴 열기">
           <i data-lucide="menu" class="w-6 h-6 text-toy-brown"></i>
         </button>
       </div>
     </div>
 
     <!-- Mobile Nav -->
-    <nav id="mobile-nav" class="hidden md:hidden border-t-3 border-toy-brown bg-toy-yellow px-4 py-3 space-y-1">
+    <nav id="mobile-nav" class="hidden lg:hidden border-t-3 border-toy-brown bg-toy-yellow px-4 py-3 space-y-1">
       <a href="#toys" class="nav-link mobile-nav-item" data-section="toys">🎁 장난감 소개</a>
       <a href="#devlog" class="nav-link mobile-nav-item" data-section="devlog">📝 개발일지</a>
       <a href="#board" class="nav-link mobile-nav-item" data-section="board">💬 자유게시판</a>
       <a href="#skins" class="nav-link mobile-nav-item" data-section="skins">🎨 스킨 마켓</a>
+      <a href="#admin" id="admin-mobile-nav" class="nav-link mobile-nav-item hidden" data-section="admin">👑 관리자 대시보드</a>
+      <div id="mobile-auth-guest" class="pt-3 border-t-2 border-toy-brown/20 flex gap-2">
+        <button id="btn-login-mobile" class="auth-btn auth-btn-outline flex-1 justify-center">로그인</button>
+        <button id="btn-signup-mobile" class="auth-btn auth-btn-primary flex-1 justify-center">회원가입</button>
+      </div>
+      <div id="mobile-auth-user" class="hidden pt-3 border-t-2 border-toy-brown/20 space-y-2">
+        <div class="flex items-center justify-between text-sm font-bold text-toy-brown px-2">
+          <span id="mobile-nickname">닉네임</span>
+          <span class="auth-cash-badge" id="mobile-cash">💰 0P</span>
+        </div>
+        <button id="btn-mypage-mobile" class="auth-btn auth-btn-outline w-full justify-center">마이페이지</button>
+        <button id="btn-logout-mobile" class="auth-btn auth-btn-ghost w-full justify-center">로그아웃</button>
+      </div>
     </nav>
   </header>
 
@@ -194,21 +220,22 @@
     <section id="board" class="section">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div class="section-header">
-          <span class="section-badge">💬 장난감 자유게시판</span>
-          <h2 class="section-title">익명 멍석, 자유롭게!</h2>
+          <span class="section-badge">💬 장난감 커뮤니티</span>
+          <h2 class="section-title" id="board-section-title">익명 멍석, 자유롭게!</h2>
           <p class="section-desc">디시인사이드 스타일 익명 커뮤니티 — 닉네임만 있으면 누구나 OK</p>
         </div>
 
-        <div class="mt-10 grid lg:grid-cols-3 gap-6">
+        <!-- Dynamic board tabs -->
+        <div class="flex flex-wrap gap-2 mt-6 mb-4" id="board-tabs">
+          <!-- Rendered by JS from Firestore -->
+        </div>
+
+        <div class="mt-6 grid lg:grid-cols-3 gap-6">
           <!-- Board list -->
           <div class="lg:col-span-2">
             <!-- Category filter -->
             <div class="flex flex-wrap gap-2 mb-4" id="board-filters">
               <button class="board-filter active" data-cat="all">전체</button>
-              <button class="board-filter" data-cat="잡담">잡담</button>
-              <button class="board-filter" data-cat="스킨자랑">스킨자랑</button>
-              <button class="board-filter" data-cat="건의/버그">건의/버그</button>
-              <button class="board-filter" data-cat="자랑거리">자랑거리</button>
             </div>
 
             <!-- Post list (DC style table) -->
@@ -250,10 +277,7 @@
               <div>
                 <label class="form-label" for="write-cat">카테고리</label>
                 <select id="write-cat" class="form-input">
-                  <option value="잡담">잡담</option>
-                  <option value="스킨자랑">스킨자랑</option>
-                  <option value="건의/버그">건의/버그</option>
-                  <option value="자랑거리">자랑거리</option>
+                  <!-- Populated dynamically -->
                 </select>
               </div>
               <div>
@@ -334,6 +358,55 @@
       </div>
     </section>
 
+    <!-- ═══════════════════ ADMIN DASHBOARD ═══════════════════ -->
+    <section id="admin" class="section">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div class="section-header">
+          <span class="section-badge">👑 관리자 대시보드</span>
+          <h2 class="section-title">ToyTools 컨트롤 센터</h2>
+          <p class="section-desc">게시판 관리, 공지 작성, 콘텐츠 강제 삭제</p>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-6 mt-10">
+          <!-- Board management -->
+          <div class="admin-panel">
+            <h3 class="admin-panel-title"><i data-lucide="layout-grid" class="w-5 h-5"></i> 게시판 관리</h3>
+            <form id="admin-board-form" class="flex flex-col sm:flex-row gap-2 mb-4">
+              <input type="text" id="admin-board-name" class="form-input flex-1" placeholder="새 게시판 이름 (예: 질문답변)" maxlength="30" required />
+              <button type="submit" class="toy-btn-3d toy-btn-3d-sm justify-center whitespace-nowrap">+ 추가</button>
+            </form>
+            <div id="admin-board-list" class="space-y-2"></div>
+          </div>
+
+          <!-- Notice write -->
+          <div class="admin-panel">
+            <h3 class="admin-panel-title"><i data-lucide="megaphone" class="w-5 h-5"></i> 공지사항 작성</h3>
+            <form id="admin-notice-form" class="space-y-3">
+              <div>
+                <label class="form-label" for="admin-notice-board">게시판</label>
+                <select id="admin-notice-board" class="form-input"></select>
+              </div>
+              <div>
+                <label class="form-label" for="admin-notice-title">제목</label>
+                <input type="text" id="admin-notice-title" class="form-input" placeholder="공지 제목" maxlength="80" required />
+              </div>
+              <div>
+                <label class="form-label" for="admin-notice-body">본문</label>
+                <textarea id="admin-notice-body" class="form-input min-h-[100px]" placeholder="공지 내용" required></textarea>
+              </div>
+              <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">📢 공지 등록</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="admin-panel mt-6">
+          <h3 class="admin-panel-title"><i data-lucide="trash-2" class="w-5 h-5"></i> 게시글 / 댓글 강제 삭제</h3>
+          <p class="text-sm text-gray-500 mb-4">게시판에서 글을 클릭하면 상세보기에서 [관리자 삭제] 버튼이 표시됩니다.</p>
+          <div id="admin-recent-posts" class="space-y-2"></div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- ═══════════════════ FOOTER ═══════════════════ -->
@@ -343,6 +416,13 @@
         <p class="text-lg sm:text-xl font-display">
           🧸 토이툴즈는 누구나 들어와서 무료로 즐기는 <span class="text-toy-yellow">열린 놀이터</span>입니다.
         </p>
+        <div class="flex flex-wrap justify-center gap-3 sm:gap-6 pt-2 text-sm">
+          <button type="button" id="link-terms" class="footer-text-link">이용약관</button>
+          <span class="text-toy-cream/30">|</span>
+          <button type="button" id="link-privacy" class="footer-text-link">개인정보 처리방침</button>
+          <span class="text-toy-cream/30">|</span>
+          <button type="button" id="admin-key-btn" class="footer-text-link opacity-40 hover:opacity-100" title="관리자 접속">🔑</button>
+        </div>
         <div class="flex justify-center gap-4 pt-2">
           <a href="https://github.com" target="_blank" rel="noopener" class="footer-icon" aria-label="GitHub">
             <i data-lucide="github" class="w-6 h-6"></i>
@@ -363,6 +443,160 @@
 
   <!-- Toast notification -->
   <div id="toast" class="toast hidden" role="status"></div>
+
+  <!-- ═══════════════════ MODALS ═══════════════════ -->
+
+  <!-- Login Modal -->
+  <div id="modal-login" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content max-w-md">
+      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="font-display text-xl text-toy-brown mb-6">🔐 로그인</h2>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="form-label" for="login-email">이메일</label>
+          <input type="email" id="login-email" class="form-input" placeholder="you@email.com" required />
+        </div>
+        <div>
+          <label class="form-label" for="login-password">비밀번호</label>
+          <input type="password" id="login-password" class="form-input" placeholder="비밀번호" minlength="6" required />
+        </div>
+        <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">로그인</button>
+      </form>
+      <p class="text-center text-sm text-gray-500 mt-4">
+        계정이 없으신가요? <button type="button" id="switch-to-signup" class="text-toy-purple font-bold hover:underline">회원가입</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- Signup Modal -->
+  <div id="modal-signup" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content max-w-md">
+      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="font-display text-xl text-toy-brown mb-6">🧸 회원가입</h2>
+      <form id="signup-form" class="space-y-4">
+        <div>
+          <label class="form-label" for="signup-email">이메일</label>
+          <input type="email" id="signup-email" class="form-input" placeholder="you@email.com" required />
+        </div>
+        <div>
+          <label class="form-label" for="signup-nickname">닉네임</label>
+          <input type="text" id="signup-nickname" class="form-input" placeholder="놀이터 닉네임" maxlength="12" required />
+        </div>
+        <div>
+          <label class="form-label" for="signup-password">비밀번호</label>
+          <input type="password" id="signup-password" class="form-input" placeholder="6자 이상" minlength="6" required />
+        </div>
+        <div>
+          <label class="form-label" for="signup-password2">비밀번호 확인</label>
+          <input type="password" id="signup-password2" class="form-input" placeholder="비밀번호 재입력" minlength="6" required />
+        </div>
+        <label class="flex items-start gap-2 text-sm cursor-pointer">
+          <input type="checkbox" id="signup-agree" class="mt-1" required />
+          <span><button type="button" class="text-toy-purple hover:underline" data-open-terms>이용약관</button> 및 <button type="button" class="text-toy-purple hover:underline" data-open-privacy>개인정보 처리방침</button>에 동의합니다.</span>
+        </label>
+        <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">가입하기</button>
+      </form>
+      <p class="text-center text-sm text-gray-500 mt-4">
+        이미 계정이 있으신가요? <button type="button" id="switch-to-login" class="text-toy-purple font-bold hover:underline">로그인</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- My Page Modal -->
+  <div id="modal-mypage" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content max-w-md">
+      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="font-display text-xl text-toy-brown mb-2">👤 마이페이지</h2>
+      <div class="mypage-profile mb-6">
+        <p class="text-sm text-gray-500">닉네임</p>
+        <p class="font-bold text-lg text-toy-brown" id="mypage-nickname">-</p>
+        <p class="text-sm text-gray-500 mt-3">이메일</p>
+        <p class="text-sm" id="mypage-email">-</p>
+        <div class="cash-display mt-4">
+          <span class="text-2xl font-display text-toy-pink" id="mypage-cash">0P</span>
+          <span class="text-sm text-gray-500 ml-2">보유 캐시</span>
+        </div>
+      </div>
+      <button type="button" id="btn-open-charge" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mb-4">
+        <i data-lucide="wallet" class="w-4 h-4"></i> 캐시 충전하기
+      </button>
+      <div>
+        <p class="form-label mb-2">보유 스킨</p>
+        <div id="mypage-skins" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cash Charge Modal -->
+  <div id="modal-charge" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content max-w-md">
+      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="font-display text-xl text-toy-brown mb-2">💰 캐시 충전</h2>
+      <p class="text-sm text-gray-500 mb-6">충전한 캐시로 스킨 마켓에서 스킨을 구매할 수 있습니다.</p>
+      <div class="grid grid-cols-2 gap-3 mb-6" id="charge-amounts">
+        <button type="button" class="charge-option" data-amount="1000">1,000P<br><span class="text-xs text-gray-400">₩1,000</span></button>
+        <button type="button" class="charge-option" data-amount="5000">5,000P<br><span class="text-xs text-gray-400">₩5,000</span></button>
+        <button type="button" class="charge-option" data-amount="10000">10,000P<br><span class="text-xs text-gray-400">₩10,000</span></button>
+        <button type="button" class="charge-option" data-amount="30000">30,000P<br><span class="text-xs text-gray-400">₩30,000</span></button>
+      </div>
+      <p class="text-center text-sm mb-4">선택 금액: <strong id="charge-selected" class="text-toy-pink">0P</strong></p>
+      <button type="button" id="btn-pay-toss" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mb-2" disabled>
+        토스페이먼츠로 결제
+      </button>
+      <button type="button" id="btn-pay-test" class="auth-btn auth-btn-outline w-full justify-center text-sm" disabled>
+        🧪 테스트 결제 (개발용)
+      </button>
+      <p class="text-xs text-gray-400 text-center mt-3">실제 PG 연동 시 토스페이먼츠 팝업이 열립니다.</p>
+    </div>
+  </div>
+
+  <!-- Terms Modal -->
+  <div id="modal-terms" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content max-w-2xl">
+      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="font-display text-xl text-toy-brown mb-4">📜 이용약관</h2>
+      <div class="terms-content" id="terms-content"></div>
+    </div>
+  </div>
+
+  <!-- Privacy Modal -->
+  <div id="modal-privacy" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content max-w-2xl">
+      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="font-display text-xl text-toy-brown mb-4">🔒 개인정보 처리방침</h2>
+      <div class="terms-content" id="privacy-content"></div>
+    </div>
+  </div>
+
+  <!-- Admin Login Modal -->
+  <div id="modal-admin-login" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-content max-w-sm">
+      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="font-display text-xl text-toy-brown mb-6">🔑 관리자 접속</h2>
+      <form id="admin-login-form" class="space-y-4">
+        <div>
+          <label class="form-label" for="admin-password">관리자 비밀번호</label>
+          <input type="password" id="admin-password" class="form-input" placeholder="비밀번호 입력" required />
+        </div>
+        <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">접속</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Toss Payments SDK (PG 연동 준비) -->
+  <script src="https://js.tosspayments.com/v1/payment"></script>
 
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
