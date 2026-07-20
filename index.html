@@ -1,9 +1,371 @@
-<!doctype html>
-<html>
-  <head>
-    <title>ToyTools</title>
-  </head>
-  <body>
-    <h1>ToyTools Landing Page Coming Soon!</h1>
-  </body>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ToyTools - AI가 판치는 세상, 가장 가볍고 아날로그한 디지털 장난감 공장. 개발일지, 익명 자유게시판, 스킨 마켓이 있는 유저 놀이터 커뮤니티." />
+  <title>🧸 ToyTools — toy-tools.com</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&family=Press+Start+2P&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Black Han Sans"', 'sans-serif'],
+            retro: ['"Press Start 2P"', 'cursive'],
+            body: ['"Noto Sans KR"', 'sans-serif'],
+          },
+          colors: {
+            toy: {
+              pink: '#FF6B9D',
+              cyan: '#00D4FF',
+              yellow: '#FFE566',
+              purple: '#9B5DE5',
+              orange: '#FF9F43',
+              mint: '#7BED9F',
+              cream: '#FFF8E7',
+              brown: '#5D4037',
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="font-body bg-toy-cream text-gray-800 overflow-x-hidden">
+
+  <!-- Retro scanline overlay -->
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <!-- ═══════════════════ HEADER ═══════════════════ -->
+  <header class="sticky top-0 z-50 border-b-4 border-toy-brown bg-toy-yellow/95 backdrop-blur-sm shadow-[0_4px_0_#5D4037]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex items-center justify-between h-16 sm:h-18">
+        <!-- Logo -->
+        <a href="#home" class="nav-link flex items-center gap-2 group" data-section="home">
+          <span class="text-3xl sm:text-4xl group-hover:animate-wiggle inline-block">🧸</span>
+          <div class="leading-tight">
+            <span class="font-display text-xl sm:text-2xl text-toy-brown tracking-tight">ToyTools</span>
+            <span class="block text-[10px] sm:text-xs text-toy-purple font-retro tracking-widest">toy-tools.com</span>
+          </div>
+        </a>
+
+        <!-- Desktop Nav -->
+        <nav class="hidden md:flex items-center gap-1">
+          <a href="#toys" class="nav-link nav-pill" data-section="toys">장난감 소개</a>
+          <a href="#devlog" class="nav-link nav-pill" data-section="devlog">개발일지</a>
+          <a href="#board" class="nav-link nav-pill" data-section="board">자유게시판</a>
+          <a href="#skins" class="nav-link nav-pill" data-section="skins">스킨 마켓</a>
+        </nav>
+
+        <!-- Mobile menu button -->
+        <button id="mobile-menu-btn" class="md:hidden p-2 rounded-lg border-3 border-toy-brown bg-white shadow-toy-sm hover:bg-toy-pink/20 transition-colors" aria-label="메뉴 열기">
+          <i data-lucide="menu" class="w-6 h-6 text-toy-brown"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Nav -->
+    <nav id="mobile-nav" class="hidden md:hidden border-t-3 border-toy-brown bg-toy-yellow px-4 py-3 space-y-1">
+      <a href="#toys" class="nav-link mobile-nav-item" data-section="toys">🎁 장난감 소개</a>
+      <a href="#devlog" class="nav-link mobile-nav-item" data-section="devlog">📝 개발일지</a>
+      <a href="#board" class="nav-link mobile-nav-item" data-section="board">💬 자유게시판</a>
+      <a href="#skins" class="nav-link mobile-nav-item" data-section="skins">🎨 스킨 마켓</a>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- ═══════════════════ HERO ═══════════════════ -->
+    <section id="home" class="section active relative overflow-hidden">
+      <div class="hero-bg absolute inset-0"></div>
+      <div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23FF6B9D\" fill-opacity=\"0.06\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-60"></div>
+
+      <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24 lg:py-32">
+        <div class="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+          <!-- Copy -->
+          <div class="text-center lg:text-left space-y-6">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border-3 border-toy-brown bg-white shadow-toy-sm text-sm font-bold text-toy-purple animate-float">
+              <span>✨</span> v1.0 정식 출시 예정
+            </div>
+            <h1 class="font-display text-3xl sm:text-4xl lg:text-5xl xl:text-6xl text-toy-brown leading-tight">
+              AI가 판치는 세상,<br />
+              <span class="text-toy-pink">가장 가볍고 아날로그한</span><br />
+              디지털 장난감 공장
+            </h1>
+            <p class="text-base sm:text-lg lg:text-xl text-gray-600 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              어려운 오픈소스? 복잡한 프로그램?<br class="hidden sm:block" />
+              이젠 클릭 한 번으로 <strong class="text-toy-purple">장난감처럼</strong> 다루세요.
+            </p>
+
+            <!-- CTA -->
+            <div class="space-y-3 pt-2">
+              <a href="#" id="download-btn" class="toy-btn-3d inline-flex items-center gap-3 text-base sm:text-lg">
+                <span class="text-2xl">🧸</span>
+                <span>ToyTools v1.0 무료 다운로드 (.exe)</span>
+              </a>
+              <p class="text-sm text-gray-500 flex items-center justify-center lg:justify-start gap-2">
+                <i data-lucide="monitor" class="w-4 h-4"></i>
+                Windows 10/11 지원 &nbsp;•&nbsp; 100% 무료 &nbsp;•&nbsp; 무설치 포터블
+              </p>
+            </div>
+          </div>
+
+          <!-- Hero Visual -->
+          <div class="relative flex justify-center">
+            <div class="hero-toy-box relative w-72 h-72 sm:w-80 sm:h-80 lg:w-96 lg:h-96">
+              <div class="absolute inset-0 rounded-3xl border-4 border-toy-brown bg-gradient-to-br from-toy-pink via-toy-purple to-toy-cyan shadow-toy-lg rotate-3 animate-float-slow"></div>
+              <div class="absolute inset-4 rounded-2xl border-4 border-dashed border-white/50 flex flex-col items-center justify-center text-white p-6 -rotate-3">
+                <span class="text-7xl sm:text-8xl mb-4 drop-shadow-lg">🧸</span>
+                <span class="font-retro text-[10px] sm:text-xs text-center leading-relaxed">TOY<br/>TOOLS</span>
+                <div class="mt-4 flex gap-2">
+                  <span class="w-3 h-3 rounded-full bg-toy-yellow animate-pulse"></span>
+                  <span class="w-3 h-3 rounded-full bg-toy-mint animate-pulse" style="animation-delay:0.2s"></span>
+                  <span class="w-3 h-3 rounded-full bg-toy-orange animate-pulse" style="animation-delay:0.4s"></span>
+                </div>
+              </div>
+              <!-- Floating decorations -->
+              <span class="absolute -top-4 -right-4 text-4xl animate-bounce-slow">⭐</span>
+              <span class="absolute -bottom-2 -left-4 text-3xl animate-wiggle">🎀</span>
+              <span class="absolute top-1/2 -right-8 text-2xl animate-float" style="animation-delay:1s">🍭</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick stats -->
+        <div class="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto lg:mx-0">
+          <div class="stat-card"><span class="stat-num">4+</span><span class="stat-label">내장 장난감</span></div>
+          <div class="stat-card"><span class="stat-num">3</span><span class="stat-label">스킨 팩</span></div>
+          <div class="stat-card"><span class="stat-num">∞</span><span class="stat-label">무료 즐거움</span></div>
+          <div class="stat-card"><span class="stat-num">0₩</span><span class="stat-label">가격</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════ TOYS SHOWCASE ═══════════════════ -->
+    <section id="toys" class="section">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div class="section-header">
+          <span class="section-badge">🎁 내장 장난감 진열장</span>
+          <h2 class="section-title">클릭 한 번, 마법 같은 도구들</h2>
+          <p class="section-desc">복잡한 설정 없이 바로 쓸 수 있는 ToyTools 내장 장난감 컬렉션</p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10" id="toy-cards">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════ DEV LOG ═══════════════════ -->
+    <section id="devlog" class="section">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div class="section-header">
+          <span class="section-badge">📝 디렉터의 개발일지</span>
+          <h2 class="section-title">만드는 이야기, 만드는 중</h2>
+          <p class="section-desc">개발 비하인드 스토리, 현황 업데이트, 스킨 제작기 이야기</p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10" id="devlog-list">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- Dev log detail modal -->
+        <div id="devlog-modal" class="modal hidden" role="dialog" aria-modal="true">
+          <div class="modal-backdrop"></div>
+          <div class="modal-content max-w-2xl">
+            <button class="modal-close" aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+            <div id="devlog-modal-body"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════ FREE BOARD ═══════════════════ -->
+    <section id="board" class="section">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div class="section-header">
+          <span class="section-badge">💬 장난감 자유게시판</span>
+          <h2 class="section-title">익명 멍석, 자유롭게!</h2>
+          <p class="section-desc">디시인사이드 스타일 익명 커뮤니티 — 닉네임만 있으면 누구나 OK</p>
+        </div>
+
+        <div class="mt-10 grid lg:grid-cols-3 gap-6">
+          <!-- Board list -->
+          <div class="lg:col-span-2">
+            <!-- Category filter -->
+            <div class="flex flex-wrap gap-2 mb-4" id="board-filters">
+              <button class="board-filter active" data-cat="all">전체</button>
+              <button class="board-filter" data-cat="잡담">잡담</button>
+              <button class="board-filter" data-cat="스킨자랑">스킨자랑</button>
+              <button class="board-filter" data-cat="건의/버그">건의/버그</button>
+              <button class="board-filter" data-cat="자랑거리">자랑거리</button>
+            </div>
+
+            <!-- Post list (DC style table) -->
+            <div class="board-table-wrapper">
+              <table class="board-table w-full">
+                <thead>
+                  <tr>
+                    <th class="w-16 hidden sm:table-cell">번호</th>
+                    <th class="w-20 hidden md:table-cell">분류</th>
+                    <th>제목</th>
+                    <th class="w-24 hidden sm:table-cell">닉네임</th>
+                    <th class="w-20 hidden md:table-cell">날짜</th>
+                    <th class="w-14 hidden lg:table-cell">조회</th>
+                  </tr>
+                </thead>
+                <tbody id="board-tbody">
+                  <!-- Rendered by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Write form -->
+          <div class="board-write-panel">
+            <h3 class="font-display text-lg text-toy-brown mb-4 flex items-center gap-2">
+              <i data-lucide="pen-line" class="w-5 h-5"></i> 글쓰기
+            </h3>
+            <form id="board-write-form" class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="form-label" for="write-nick">익명 닉네임</label>
+                  <input type="text" id="write-nick" class="form-input" placeholder="익명" maxlength="12" required />
+                </div>
+                <div>
+                  <label class="form-label" for="write-pw">비밀번호</label>
+                  <input type="password" id="write-pw" class="form-input" placeholder="삭제용" maxlength="20" required />
+                </div>
+              </div>
+              <div>
+                <label class="form-label" for="write-cat">카테고리</label>
+                <select id="write-cat" class="form-input">
+                  <option value="잡담">잡담</option>
+                  <option value="스킨자랑">스킨자랑</option>
+                  <option value="건의/버그">건의/버그</option>
+                  <option value="자랑거리">자랑거리</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="write-title">글 제목</label>
+                <input type="text" id="write-title" class="form-input" placeholder="제목을 입력하세요" maxlength="80" required />
+              </div>
+              <div>
+                <label class="form-label" for="write-body">본문</label>
+                <textarea id="write-body" class="form-input min-h-[120px] resize-y" placeholder="자유롭게 적어주세요~" required></textarea>
+              </div>
+              <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">
+                <i data-lucide="send" class="w-4 h-4"></i> 등록하기
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Post detail view -->
+        <div id="board-detail" class="hidden mt-8">
+          <div class="board-detail-panel">
+            <button id="board-back-btn" class="text-sm text-toy-purple hover:underline mb-4 flex items-center gap-1">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> 목록으로
+            </button>
+            <div id="board-detail-content"></div>
+
+            <!-- Comments -->
+            <div class="mt-8 border-t-3 border-dashed border-toy-brown/20 pt-6">
+              <h4 class="font-bold text-toy-brown mb-4 flex items-center gap-2">
+                <i data-lucide="message-circle" class="w-5 h-5"></i>
+                댓글 <span id="comment-count" class="text-toy-pink">0</span>
+              </h4>
+              <div id="comment-list" class="space-y-3 mb-4"></div>
+              <form id="comment-form" class="flex flex-col sm:flex-row gap-2">
+                <input type="text" id="comment-nick" class="form-input sm:w-28" placeholder="닉네임" maxlength="12" required />
+                <input type="text" id="comment-body" class="form-input flex-1" placeholder="댓글을 입력하세요" maxlength="300" required />
+                <button type="submit" class="toy-btn-3d toy-btn-3d-sm justify-center whitespace-nowrap">
+                  <i data-lucide="message-square-plus" class="w-4 h-4"></i> 댓글
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════ SKIN MARKET ═══════════════════ -->
+    <section id="skins" class="section">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div class="section-header">
+          <span class="section-badge">🎨 스킨 마켓</span>
+          <h2 class="section-title">3세대 스킨팩 컬렉션</h2>
+          <p class="section-desc">곰인형, 롤리팝 등 키치한 스킨으로 ToyTools를 나만의 색깔로!</p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10" id="skin-cards">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- Support banner -->
+        <div class="mt-12 support-banner rounded-2xl border-4 border-toy-brown p-6 sm:p-10 text-center">
+          <span class="text-4xl mb-4 block">☕</span>
+          <h3 class="font-display text-xl sm:text-2xl text-toy-brown mb-2">응원 &amp; 후원으로 놀이터를 키워주세요!</h3>
+          <p class="text-gray-600 mb-6 max-w-lg mx-auto">
+            ToyTools는 완전 무료 오픈 프로젝트입니다. 커피 한 잔의 응원이 더 많은 장난감을 만듭니다.
+          </p>
+          <div class="flex flex-wrap justify-center gap-4">
+            <a href="https://github.com" target="_blank" rel="noopener" class="support-link">
+              <i data-lucide="github" class="w-5 h-5"></i> GitHub Star
+            </a>
+            <a href="https://discord.com" target="_blank" rel="noopener" class="support-link">
+              <i data-lucide="message-circle" class="w-5 h-5"></i> Discord
+            </a>
+            <a href="#" class="support-link support-link-coffee">
+              <i data-lucide="coffee" class="w-5 h-5"></i> 커피 후원
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <footer class="border-t-4 border-toy-brown bg-toy-brown text-toy-cream">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+      <div class="text-center space-y-4">
+        <p class="text-lg sm:text-xl font-display">
+          🧸 토이툴즈는 누구나 들어와서 무료로 즐기는 <span class="text-toy-yellow">열린 놀이터</span>입니다.
+        </p>
+        <div class="flex justify-center gap-4 pt-2">
+          <a href="https://github.com" target="_blank" rel="noopener" class="footer-icon" aria-label="GitHub">
+            <i data-lucide="github" class="w-6 h-6"></i>
+          </a>
+          <a href="https://discord.com" target="_blank" rel="noopener" class="footer-icon" aria-label="Discord">
+            <i data-lucide="message-circle" class="w-6 h-6"></i>
+          </a>
+          <a href="#" class="footer-icon" aria-label="커피 후원">
+            <i data-lucide="coffee" class="w-6 h-6"></i>
+          </a>
+        </div>
+        <p class="text-sm text-toy-cream/60 pt-4">
+          Copyright &copy; 2026 ToyTools &mdash; toy-tools.com
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="app.js"></script>
+</body>
 </html>
