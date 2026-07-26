@@ -36,6 +36,8 @@
   let postsUnsubscribe = null;
   let selectedChargeAmount = 0;
   let tossPayments = null;
+  let toymarketTab = 'skins';
+  let resourcesTab = 'download';
 
   const CAT_CLASS = {
     '잡담': 'cat-chat',
@@ -68,9 +70,43 @@
   ];
 
   const SKINS = [
-    { id: 'bear', emoji: '🧸', name: '곰인형 스킨팩', gen: '3세대', price: 3000, desc: '따뜻한 브라운 톤과 봉제 인형 텍스처.', bg: 'linear-gradient(135deg, #D4A574, #8B6914)' },
-    { id: 'lollipop', emoji: '🍭', name: '롤리팝 스킨팩', gen: '3세대', price: 5000, desc: '파스텔 그라데이션과 캔디 컬러.', bg: 'linear-gradient(135deg, #FF6B9D, #FFE566, #00D4FF)' },
-    { id: 'arcade', emoji: '👾', name: '레트로 아케이드 스킨팩', gen: '3세대', price: 7000, desc: '네온 픽셀 아트와 CRT 스캔라인.', bg: 'linear-gradient(135deg, #1a1a2e, #9B5DE5, #00D4FF)' },
+    { id: 'bear', emoji: '🎨', name: 'Midnight Studio', gen: 'Pro Theme', price: 3000, desc: 'VS Code 스타일 다크 테마. 눈의 피로를 줄이는 딥 슬레이트 팔레트.', bg: 'linear-gradient(135deg, #1e293b, #0f172a)' },
+    { id: 'lollipop', emoji: '✨', name: 'Neon Drift', gen: 'Pro Theme', price: 5000, desc: '인디고-바이올렛 네온 액센트. 모던 SaaS 감성의 프리미엄 스킨.', bg: 'linear-gradient(135deg, #312e81, #6366f1)' },
+    { id: 'arcade', emoji: '⚡', name: 'Steel Blue IDE', gen: 'Pro Theme', price: 7000, desc: '스틸 블루 기반 프로페셔널 워크스페이스 테마.', bg: 'linear-gradient(135deg, #0c4a6e, #1e3a5f)' },
+  ];
+
+  const MINIGAMES = [
+    { id: 'pixel-runner', emoji: '🎮', name: 'Pixel Runner', tag: 'Mini Game', price: 2000, desc: '업무 휴식용 레트로 러너. ToyTools 트레이에서 바로 실행.', bg: 'linear-gradient(135deg, #1a1a2e, #4c1d95)' },
+    { id: 'code-puzzle', emoji: '🧩', name: 'Code Puzzle', tag: 'Mini Game', price: 1500, desc: '로직 퍼즐로 사고를 환기시키는 미니 브레인 게임.', bg: 'linear-gradient(135deg, #134e4a, #115e59)' },
+    { id: 'focus-timer', emoji: '⏱️', name: 'Focus Timer Rush', tag: 'Mini Game', price: 1000, desc: '포모도로 + 미니 챌린지. 생산성과 재미를 동시에.', bg: 'linear-gradient(135deg, #7c2d12, #9a3412)' },
+  ];
+
+  const EXTENSIONS = [
+    { id: 'batch-renamer', emoji: '📁', name: 'Batch Renamer Pro', tag: 'Extension', price: 4000, desc: '대량 파일 이름 일괄 변경. 정규식 규칙 지원.', bg: 'linear-gradient(135deg, #1e3a5f, #0f172a)' },
+    { id: 'api-tester', emoji: '🔌', name: 'REST API Tester', tag: 'Extension', price: 6000, desc: 'Postman 대체 경량 API 테스터. 히스토리 자동 저장.', bg: 'linear-gradient(135deg, #312e81, #1e1b4b)' },
+    { id: 'markdown-studio', emoji: '📝', name: 'Markdown Studio', tag: 'Extension', price: 3500, desc: '실시간 프리뷰 마크다운 에디터. PDF보내기 지원.', bg: 'linear-gradient(135deg, #3f3f46, #18181b)' },
+  ];
+
+  const CHANGELOG = [
+    { version: 'v1.0.0', date: '2026-07-26', notes: '정식 출시 — 쇼츠 메이커, 크롤러, 디스크 가디언, WPC 변환기 포함. 토이마켓 및 개발자센터 오픈.' },
+    { version: 'v0.9.2', date: '2026-07-15', notes: '베타 9.2 — 크롤러 속도 3배 개선, 메모리 최적화, 다크 테마 스킨 3종 추가.' },
+    { version: 'v0.9.0', date: '2026-06-28', notes: '베타 9.0 — ToyTools Studio UI 전면 개편, 포터블 .exe 배포 시작.' },
+  ];
+
+  const FAQ_ITEMS = [
+    { q: 'ToyTools는 무료인가요?', a: '네, 핵심 유틸리티는 100% 무료입니다. 토이마켓의 스킨·미니게임·확장팩은 캐시로 구매할 수 있습니다.' },
+    { q: 'Windows 외 OS를 지원하나요?', a: '현재 Windows 10/11만 공식 지원합니다. macOS/Linux 버전은 로드맵에 포함되어 있습니다.' },
+    { q: '설치 없이 사용할 수 있나요?', a: '네, 포터블 .exe 형태로 제공됩니다. USB에 넣어 어디서든 실행할 수 있습니다.' },
+    { q: '캐시 환불이 가능한가요?', a: '디지털 콘텐츠 특성상 구매 후 환불은 제한적이며, 관련 법령에 따라 처리됩니다.' },
+    { q: '확장팩을 직접 등록하려면?', a: '개발자센터에서 등록 신청서를 제출하세요. 심사 후 토이마켓에 배포됩니다.' },
+  ];
+
+  const GUIDE_STEPS = [
+    { title: '다운로드 & 실행', desc: '자료실에서 ToyTools v1.0 .exe를 다운로드하고 더블클릭으로 실행하세요. 설치 과정이 없습니다.' },
+    { title: '장난감 선택', desc: '메인 화면에서 쇼츠 메이커, 크롤러 등 원하는 유틸리티를 클릭해 바로 사용을 시작합니다.' },
+    { title: '계정 연동', desc: '회원가입 후 로그인하면 캐시 충전, 토이마켓 구매, 클라우드 설정 동기화를 이용할 수 있습니다.' },
+    { title: '토이마켓 탐색', desc: '스킨 팩으로 UI를 커스터마이즈하고, 미니게임과 확장 팩으로 워크플로우를 확장하세요.' },
+    { title: '커뮤니티 활용', desc: '자유게시판에서 피드백을 남기고, 자료실 FAQ에서 궁금한 점을 확인하세요.' },
   ];
 
   const TERMS_HTML = `
@@ -118,7 +154,12 @@
     bindAdminUI();
     renderToyCards();
     renderDevLogs();
-    renderSkinCards();
+    renderToyMarket();
+    renderResources();
+    bindToyMarketTabs();
+    bindResourcesTabs();
+    bindDeveloperCenter();
+    bindFooterNav();
     bindNavigation();
     bindMobileMenu();
     bindBoardEvents();
@@ -157,7 +198,8 @@
           userProfile = null;
         }
         updateAuthUI(user);
-        renderSkinCards();
+        renderToyMarket();
+        updateDeveloperDashboard();
       });
     } catch (err) {
       console.error('[ToyTools] Firebase 초기화 실패:', err);
@@ -221,7 +263,7 @@
       const nick = userProfile.nickname || '유저';
       const cash = (userProfile.cash || 0).toLocaleString();
       ['#header-nickname', '#mobile-nickname'].forEach((s) => { const el = $(s); if (el) el.textContent = nick; });
-      ['#header-cash', '#mobile-cash'].forEach((s) => { const el = $(s); if (el) el.textContent = `💰 ${cash}P`; });
+      ['#header-cash', '#mobile-cash'].forEach((s) => { const el = $(s); if (el) el.textContent = `${cash}P`; });
     } else {
       guestEls.forEach((el) => el?.classList.remove('hidden'));
       userEls.forEach((el) => el?.classList.add('hidden'));
@@ -248,7 +290,7 @@
       try {
         await signIn($('#login-email').value.trim(), $('#login-password').value);
         closeAllModals();
-        showToast('로그인 성공! 🧸');
+        showToast('로그인되었습니다.');
         e.target.reset();
       } catch (err) {
         showToast(getAuthErrorMessage(err));
@@ -263,7 +305,7 @@
       try {
         await signUp($('#signup-email').value.trim(), pw, $('#signup-nickname').value.trim());
         closeAllModals();
-        showToast('회원가입 완료! 환영합니다 🎉');
+        showToast('회원가입이 완료되었습니다.');
         e.target.reset();
       } catch (err) {
         showToast(getAuthErrorMessage(err));
@@ -337,7 +379,7 @@
     if (isTest) {
       await addCash(selectedChargeAmount);
       closeAllModals();
-      showToast(`🧪 테스트 결제 완료! +${selectedChargeAmount.toLocaleString()}P`);
+      showToast(`테스트 결제 완료: +${selectedChargeAmount.toLocaleString()}P`);
       return;
     }
 
@@ -414,8 +456,8 @@
       });
     });
     await loadUserProfile(currentUser.uid);
-    renderSkinCards();
-    showToast(`${skin.name} 구매 완료! 🎉`);
+    renderToyMarket();
+    showToast(`${skin.name} 구매가 완료되었습니다.`);
   }
 
   // ═══════════════════ BOARDS (FIRESTORE) ═══════════════════
@@ -578,8 +620,8 @@
           <td>
             ${p.isNotice ? '<span class="post-notice-badge">공지</span>' : ''}
             <span class="md:hidden cat-tag ${catClass} mr-1">${escapeHtml(p.cat)}</span>
-            <span class="font-medium ${p.isNotice ? 'text-toy-purple' : 'text-gray-800'}">${escapeHtml(p.title)}</span>
-            ${commentCount > 0 ? `<span class="text-toy-pink text-xs ml-1">[${commentCount}]</span>` : ''}
+            <span class="font-medium ${p.isNotice ? 'text-indigo-400' : 'text-gray-200'}">${escapeHtml(p.title)}</span>
+            ${commentCount > 0 ? `<span class="text-indigo-400 text-xs ml-1">[${commentCount}]</span>` : ''}
           </td>
           <td class="hidden sm:table-cell text-gray-500">${escapeHtml(p.nick)}</td>
           <td class="hidden md:table-cell text-gray-400 text-xs">${(p.date || '').slice(5)}</td>
@@ -697,7 +739,7 @@
         renderBoard();
       }
       e.target.reset();
-      showToast('게시글이 등록되었습니다! 🎉');
+      showToast('게시글이 등록되었습니다.');
     });
 
     $('#board-back-btn')?.addEventListener('click', () => {
@@ -750,7 +792,7 @@
         closeAllModals();
         updateAdminUI();
         navigateTo('admin');
-        showToast('👑 관리자 모드 활성화');
+        showToast('관리자 모드가 활성화되었습니다.');
         e.target.reset();
       } else {
         showToast('비밀번호가 올바르지 않습니다.');
@@ -805,7 +847,7 @@
         }
       }
       e.target.reset();
-      showToast('📢 공지사항이 등록되었습니다.');
+      showToast('공지사항이 등록되었습니다.');
     });
   }
 
@@ -922,6 +964,8 @@
 
     $('#link-terms')?.addEventListener('click', () => openModal('modal-terms'));
     $('#link-privacy')?.addEventListener('click', () => openModal('modal-privacy'));
+    $('#link-terms-footer')?.addEventListener('click', () => openModal('modal-terms'));
+    $('#link-privacy-footer')?.addEventListener('click', () => openModal('modal-privacy'));
     $$('[data-open-terms]').forEach((el) => el.addEventListener('click', () => openModal('modal-terms')));
     $$('[data-open-privacy]').forEach((el) => el.addEventListener('click', () => openModal('modal-privacy')));
   }
@@ -941,7 +985,22 @@
   }
 
   // ═══════════════════ NAVIGATION ═══════════════════
-  function navigateTo(section) {
+  const VALID_SECTIONS = ['home', 'toys', 'devlog', 'board', 'toymarket', 'developer', 'resources', 'admin'];
+  const HASH_ALIASES = { skins: 'toymarket' };
+
+  function parseHash() {
+    const raw = window.location.hash.replace('#', '') || 'home';
+    const [section, subtab] = raw.split('.');
+    const resolved = HASH_ALIASES[section] || section;
+    return { section: resolved, subtab };
+  }
+
+  function buildHash(section, subtab) {
+    if (!section || section === 'home') return '';
+    return subtab ? `${section}.${subtab}` : section;
+  }
+
+  function navigateTo(section, subtab) {
     if (section === 'admin' && !isAdmin) {
       openModal('modal-admin-login');
       return;
@@ -954,14 +1013,30 @@
       el.classList.toggle('active', el.dataset.section === section);
     });
 
-    if (section !== (window.location.hash.replace('#', '') || 'home')) {
-      window.location.hash = section === 'home' ? '' : section;
+    const newHash = buildHash(section, subtab);
+    const currentRaw = window.location.hash.replace('#', '');
+    if (newHash !== currentRaw) {
+      window.location.hash = newHash;
     }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
     closeMobileMenu();
     viewingPostId = null;
     $('#board-detail')?.classList.add('hidden');
 
+    if (section === 'toymarket' && subtab) {
+      setToyMarketTab(subtab, false);
+    } else if (section === 'toymarket') {
+      renderToyMarket();
+    }
+    if (section === 'resources' && subtab) {
+      setResourcesTab(subtab, false);
+    } else if (section === 'resources') {
+      renderResourcesPanels();
+    }
+    if (section === 'developer') {
+      updateDeveloperDashboard();
+    }
     if (section === 'admin' && isAdmin) {
       renderAdminBoardList();
       renderAdminRecentPosts();
@@ -969,9 +1044,12 @@
   }
 
   function handleHashRoute() {
-    const hash = window.location.hash.replace('#', '') || 'home';
-    const valid = ['home', 'toys', 'devlog', 'board', 'skins', 'admin'];
-    navigateTo(valid.includes(hash) ? hash : 'home');
+    const { section, subtab } = parseHash();
+    if (!VALID_SECTIONS.includes(section)) {
+      navigateTo('home');
+      return;
+    }
+    navigateTo(section, subtab);
   }
 
   function bindNavigation() {
@@ -981,6 +1059,20 @@
         const section = link.dataset.section;
         if (section) navigateTo(section);
       });
+    });
+  }
+
+  function bindFooterNav() {
+    $$('[data-footer-nav]').forEach((btn) => {
+      btn.addEventListener('click', () => navigateTo(btn.dataset.footerNav));
+    });
+    $('#footer-contact-btn')?.addEventListener('click', () => {
+      navigateTo('resources', 'qna');
+      setTimeout(() => $('#contact-email')?.focus(), 300);
+    });
+    $('#resources-download-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      showToast('ToyTools v1.0 다운로드 준비 중입니다.');
     });
   }
 
@@ -1036,7 +1128,7 @@
     if (!body) return;
     body.innerHTML = `
       <div class="text-4xl mb-4">${post.emoji}</div>
-      <h2 class="font-display text-xl sm:text-2xl text-toy-brown mb-3">${escapeHtml(post.title)}</h2>
+      <h2 class="text-xl sm:text-2xl font-semibold text-white mb-3">${escapeHtml(post.title)}</h2>
       <div class="flex flex-wrap gap-4 text-sm text-gray-400 mb-6">
         <span>📅 ${post.date}</span>
         <span>👁 ${post.views.toLocaleString()}</span>
@@ -1054,32 +1146,237 @@
     modal.querySelector('.modal-close')?.addEventListener('click', () => modal.classList.add('hidden'));
   }
 
-  function renderSkinCards() {
-    const container = $('#skin-cards');
+  function renderSkinCards() { renderToyMarket(); }
+
+  function bindToyMarketTabs() {
+    $$('[data-toymarket-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => setToyMarketTab(btn.dataset.toymarketTab));
+    });
+  }
+
+  function setToyMarketTab(tab, updateHash = true) {
+    toymarketTab = tab;
+    $$('[data-toymarket-tab]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.toymarketTab === tab);
+    });
+    renderToyMarket();
+    if (updateHash) {
+      const h = buildHash('toymarket', tab === 'skins' ? null : tab);
+      if (window.location.hash.replace('#', '') !== h) window.location.hash = h;
+    }
+  }
+
+  function renderToyMarket() {
+    const container = $('#toymarket-grid');
     if (!container) return;
+
+    let items;
+    let buyType;
+    if (toymarketTab === 'games') {
+      items = MINIGAMES;
+      buyType = 'game';
+    } else if (toymarketTab === 'extensions') {
+      items = EXTENSIONS;
+      buyType = 'extension';
+    } else {
+      items = SKINS;
+      buyType = 'skin';
+    }
+
     const owned = userProfile?.ownedSkins || [];
-    container.innerHTML = SKINS.map((s) => {
-      const hasOwned = owned.includes(s.id);
+    const ownedKey = userProfile?.ownedItems || [];
+
+    container.innerHTML = items.map((item) => {
+      const ownedCheck = buyType === 'skin'
+        ? owned.includes(item.id)
+        : ownedKey.includes(item.id);
+      const genLabel = item.gen || item.tag || '';
       return `
-        <div class="skin-card">
-          <div class="skin-card-preview" style="background:${s.bg}">${s.emoji}</div>
-          <div class="skin-card-info">
-            <h3 class="skin-card-name">${escapeHtml(s.name)}</h3>
-            <span class="skin-card-gen">${s.gen}</span>
-            <p class="skin-card-desc">${escapeHtml(s.desc)}</p>
-            <p class="text-sm font-bold text-toy-pink mt-2">${s.price.toLocaleString()}P</p>
-            ${hasOwned
-              ? '<span class="skin-owned-label">✅ 보유 중</span>'
-              : `<button class="toy-btn-3d toy-btn-3d-sm skin-buy-btn justify-center" data-buy-skin="${s.id}">구매하기</button>`
+        <div class="market-card">
+          <div class="market-card-preview" style="background:${item.bg}">${item.emoji}</div>
+          <div class="market-card-body">
+            <span class="market-card-tag">${escapeHtml(genLabel)}</span>
+            <h3 class="market-card-name">${escapeHtml(item.name)}</h3>
+            <p class="market-card-desc">${escapeHtml(item.desc)}</p>
+            <p class="market-card-price">${item.price.toLocaleString()}P</p>
+            ${ownedCheck
+              ? '<span class="skin-owned-label">보유 중</span>'
+              : `<button class="toy-btn-3d toy-btn-3d-sm skin-buy-btn justify-center" data-buy-type="${buyType}" data-buy-id="${item.id}">구매하기</button>`
             }
           </div>
         </div>
       `;
     }).join('');
 
-    container.querySelectorAll('[data-buy-skin]').forEach((btn) => {
-      btn.addEventListener('click', () => buySkin(btn.dataset.buySkin));
+    container.querySelectorAll('[data-buy-id]').forEach((btn) => {
+      btn.addEventListener('click', () => buyMarketItem(btn.dataset.buyType, btn.dataset.buyId));
     });
+    lucide.createIcons();
+  }
+
+  async function buyMarketItem(type, itemId) {
+    if (type === 'skin') {
+      return buySkin(itemId);
+    }
+    if (!currentUser || !userProfile) {
+      showToast('로그인 후 구매할 수 있습니다.');
+      return;
+    }
+    const catalog = type === 'game' ? MINIGAMES : EXTENSIONS;
+    const item = catalog.find((i) => i.id === itemId);
+    if (!item) return;
+    const owned = userProfile.ownedItems || [];
+    if (owned.includes(itemId)) {
+      showToast('이미 보유한 아이템입니다.');
+      return;
+    }
+    if ((userProfile.cash || 0) < item.price) {
+      showToast(`캐시가 부족합니다. (필요: ${item.price.toLocaleString()}P)`);
+      return;
+    }
+    if (!db) {
+      userProfile.cash -= item.price;
+      if (!userProfile.ownedItems) userProfile.ownedItems = [];
+      userProfile.ownedItems.push(itemId);
+      updateAuthUI(currentUser);
+      renderToyMarket();
+      showToast(`${item.name} 구매가 완료되었습니다.`);
+      return;
+    }
+    const ref = db.collection('users').doc(currentUser.uid);
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      const data = doc.data();
+      const items = data.ownedItems || [];
+      if ((data.cash || 0) < item.price) throw new Error('잔액 부족');
+      if (items.includes(itemId)) throw new Error('이미 보유');
+      tx.update(ref, {
+        cash: data.cash - item.price,
+        ownedItems: firebase.firestore.FieldValue.arrayUnion(itemId),
+      });
+    });
+    await loadUserProfile(currentUser.uid);
+    renderToyMarket();
+    showToast(`${item.name} 구매가 완료되었습니다.`);
+  }
+
+  function bindResourcesTabs() {
+    $$('[data-resources-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => setResourcesTab(btn.dataset.resourcesTab));
+    });
+    $('#contact-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      showToast('문의가 접수되었습니다. 1~2 영업일 내 답변드립니다.');
+      e.target.reset();
+    });
+  }
+
+  function setResourcesTab(tab, updateHash = true) {
+    resourcesTab = tab;
+    $$('[data-resources-tab]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.resourcesTab === tab);
+    });
+    renderResourcesPanels();
+    if (updateHash) {
+      const h = buildHash('resources', tab === 'download' ? null : tab);
+      if (window.location.hash.replace('#', '') !== h) window.location.hash = h;
+    }
+  }
+
+  function renderResources() {
+    renderChangelog();
+    renderFAQ();
+    renderGuide();
+    renderResourcesPanels();
+  }
+
+  function renderResourcesPanels() {
+    const panels = { download: '#resources-download', qna: '#resources-qna', guide: '#resources-guide' };
+    Object.entries(panels).forEach(([key, sel]) => {
+      const el = $(sel);
+      if (el) el.classList.toggle('hidden', key !== resourcesTab);
+    });
+  }
+
+  function renderChangelog() {
+    const container = $('#changelog-list');
+    if (!container) return;
+    container.innerHTML = CHANGELOG.map((c) => `
+      <div class="changelog-item">
+        <div><span class="changelog-version">${escapeHtml(c.version)}</span><span class="changelog-date">${c.date}</span></div>
+        <p class="changelog-notes">${escapeHtml(c.notes)}</p>
+      </div>
+    `).join('');
+  }
+
+  function renderFAQ() {
+    const container = $('#faq-accordion');
+    if (!container) return;
+    container.innerHTML = FAQ_ITEMS.map((f, i) => `
+      <div class="faq-item" data-faq="${i}">
+        <button type="button" class="faq-question">
+          <span>${escapeHtml(f.q)}</span>
+          <i data-lucide="chevron-down" class="faq-chevron w-4 h-4"></i>
+        </button>
+        <div class="faq-answer">${escapeHtml(f.a)}</div>
+      </div>
+    `).join('');
+    container.querySelectorAll('.faq-question').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const item = btn.closest('.faq-item');
+        const wasOpen = item.classList.contains('open');
+        container.querySelectorAll('.faq-item').forEach((el) => el.classList.remove('open'));
+        if (!wasOpen) item.classList.add('open');
+      });
+    });
+    lucide.createIcons();
+  }
+
+  function renderGuide() {
+    const container = $('#guide-content');
+    if (!container) return;
+    container.innerHTML = GUIDE_STEPS.map((s, i) => `
+      <div class="guide-step">
+        <span class="guide-step-num">${i + 1}</span>
+        <div>
+          <p class="guide-step-title">${escapeHtml(s.title)}</p>
+          <p class="guide-step-desc">${escapeHtml(s.desc)}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function bindDeveloperCenter() {
+    $('#dev-submit-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!currentUser) {
+        showToast('로그인 후 등록 신청이 가능합니다.');
+        openModal('modal-login');
+        return;
+      }
+      showToast('등록 신청이 접수되었습니다. 심사 후 연락드립니다.');
+      e.target.reset();
+    });
+    $$('.doc-link').forEach((link) => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        showToast('API 문서는 docs.toy-tools.com 오픈 시 제공됩니다.');
+      });
+    });
+    updateDeveloperDashboard();
+  }
+
+  function updateDeveloperDashboard() {
+    const loggedIn = !!currentUser;
+    const month = loggedIn ? '₩124,500' : '₩0';
+    const total = loggedIn ? '₩892,000' : '₩0';
+    const count = loggedIn ? '3' : '0';
+    const m = $('#dev-revenue-month');
+    const t = $('#dev-revenue-total');
+    const c = $('#dev-creations-count');
+    if (m) m.textContent = month;
+    if (t) t.textContent = total;
+    if (c) c.textContent = count;
   }
 
   function bindDownloadBtn() {
@@ -1090,7 +1387,7 @@
     btn.addEventListener('mouseleave', () => btn.classList.remove('pressed'));
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      showToast('🧸 ToyTools v1.0 다운로드 준비 중입니다!');
+      showToast('ToyTools v1.0 다운로드 준비 중입니다.');
     });
   }
 
