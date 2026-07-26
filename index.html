@@ -238,84 +238,42 @@
         </div>
 
         <!-- Dynamic board tabs -->
-        <div class="flex flex-wrap gap-2 mt-6 mb-4" id="board-tabs">
-          <!-- Rendered by JS from Firestore -->
-        </div>
+        <div class="flex flex-wrap gap-2 mt-6 mb-4" id="board-tabs"></div>
 
-        <div class="mt-6 grid lg:grid-cols-3 gap-6">
-          <!-- Board list -->
-          <div class="lg:col-span-2">
-            <!-- Category filter -->
-            <div class="flex flex-wrap gap-2 mb-4" id="board-filters">
+        <!-- LIST view -->
+        <div id="board-list-view" class="board-list-view">
+          <div class="board-toolbar">
+            <div class="flex flex-wrap gap-2" id="board-filters">
               <button class="board-filter active" data-cat="all">전체</button>
             </div>
-
-            <!-- Post list (DC style table) -->
-            <div class="board-table-wrapper">
-              <table class="board-table w-full">
-                <thead>
-                  <tr>
-                    <th class="w-16 hidden sm:table-cell">번호</th>
-                    <th class="w-20 hidden md:table-cell">분류</th>
-                    <th>제목</th>
-                    <th class="w-24 hidden sm:table-cell">닉네임</th>
-                    <th class="w-20 hidden md:table-cell">날짜</th>
-                    <th class="w-14 hidden lg:table-cell">조회</th>
-                  </tr>
-                </thead>
-                <tbody id="board-tbody">
-                  <!-- Rendered by JS -->
-                </tbody>
-              </table>
-            </div>
+            <button type="button" id="btn-board-write" class="toy-btn-3d toy-btn-3d-sm">
+              <i data-lucide="pen-line" class="w-4 h-4"></i> 글쓰기
+            </button>
           </div>
-
-          <!-- Write form -->
-          <div class="board-write-panel">
-            <h3 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
-              <i data-lucide="pen-line" class="w-4 h-4 text-studio-accent"></i> 글쓰기
-            </h3>
-            <form id="board-write-form" class="space-y-3">
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="form-label" for="write-nick">익명 닉네임</label>
-                  <input type="text" id="write-nick" class="form-input" placeholder="익명" maxlength="12" required />
-                </div>
-                <div>
-                  <label class="form-label" for="write-pw">비밀번호</label>
-                  <input type="password" id="write-pw" class="form-input" placeholder="삭제용" maxlength="20" required />
-                </div>
-              </div>
-              <div>
-                <label class="form-label" for="write-cat">카테고리</label>
-                <select id="write-cat" class="form-input">
-                  <!-- Populated dynamically -->
-                </select>
-              </div>
-              <div>
-                <label class="form-label" for="write-title">글 제목</label>
-                <input type="text" id="write-title" class="form-input" placeholder="제목을 입력하세요" maxlength="80" required />
-              </div>
-              <div>
-                <label class="form-label" for="write-body">본문</label>
-                <textarea id="write-body" class="form-input min-h-[120px] resize-y" placeholder="자유롭게 적어주세요~" required></textarea>
-              </div>
-              <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">
-                <i data-lucide="send" class="w-4 h-4"></i> 등록하기
-              </button>
-            </form>
+          <div class="board-table-wrapper mt-4">
+            <table class="board-table w-full">
+              <thead>
+                <tr>
+                  <th class="w-16 hidden sm:table-cell">번호</th>
+                  <th class="w-20 hidden md:table-cell">분류</th>
+                  <th>제목</th>
+                  <th class="w-24 hidden sm:table-cell">닉네임</th>
+                  <th class="w-20 hidden md:table-cell">날짜</th>
+                  <th class="w-14 hidden lg:table-cell">조회</th>
+                </tr>
+              </thead>
+              <tbody id="board-tbody"></tbody>
+            </table>
           </div>
         </div>
 
-        <!-- Post detail view -->
-        <div id="board-detail" class="hidden mt-8">
+        <!-- DETAIL view -->
+        <div id="board-detail-view" class="board-detail-view hidden">
           <div class="board-detail-panel">
-            <button id="board-back-btn" class="link-subtle text-sm mb-4 flex items-center gap-1">
+            <button type="button" class="board-back-btn link-subtle" data-board-back>
               <i data-lucide="arrow-left" class="w-4 h-4"></i> 목록으로
             </button>
             <div id="board-detail-content"></div>
-
-            <!-- Comments -->
             <div class="mt-8 border-t border-white/10 pt-6">
               <h4 class="font-semibold text-white mb-4 flex items-center gap-2 text-sm">
                 <i data-lucide="message-circle" class="w-4 h-4"></i>
@@ -330,6 +288,9 @@
                 </button>
               </form>
             </div>
+            <button type="button" class="board-back-btn board-back-btn-bottom link-subtle" data-board-back>
+              <i data-lucide="arrow-left" class="w-4 h-4"></i> 목록으로
+            </button>
           </div>
         </div>
       </div>
@@ -749,6 +710,47 @@
           <input type="password" id="admin-password" class="form-input" placeholder="비밀번호 입력" required />
         </div>
         <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">접속</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Board Write Modal -->
+  <div id="modal-board-write" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-board-write></div>
+    <div class="modal-content max-w-lg">
+      <button type="button" class="modal-close" data-close-board-write aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+        <i data-lucide="pen-line" class="w-5 h-5 text-studio-accent"></i> 글쓰기
+      </h2>
+      <form id="board-write-form" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="form-label" for="write-nick">익명 닉네임</label>
+            <input type="text" id="write-nick" class="form-input" placeholder="익명" maxlength="12" required />
+          </div>
+          <div>
+            <label class="form-label" for="write-pw">비밀번호</label>
+            <input type="password" id="write-pw" class="form-input" placeholder="삭제용" maxlength="20" required />
+          </div>
+        </div>
+        <div>
+          <label class="form-label" for="write-cat">카테고리</label>
+          <select id="write-cat" class="form-input"></select>
+        </div>
+        <div>
+          <label class="form-label" for="write-title">글 제목</label>
+          <input type="text" id="write-title" class="form-input" placeholder="제목을 입력하세요" maxlength="80" required />
+        </div>
+        <div>
+          <label class="form-label" for="write-body">본문</label>
+          <textarea id="write-body" class="form-input min-h-[140px] resize-y" placeholder="내용을 입력하세요" required></textarea>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" class="btn-ghost flex-1 justify-center" data-close-board-write>취소</button>
+          <button type="submit" class="toy-btn-3d toy-btn-3d-sm flex-1 justify-center">
+            <i data-lucide="send" class="w-4 h-4"></i> 등록하기
+          </button>
+        </div>
       </form>
     </div>
   </div>

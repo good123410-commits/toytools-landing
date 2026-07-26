@@ -29,6 +29,7 @@
   let userProfile = null;
   let isAdmin = false;
   let boardFilter = 'all';
+  let boardView = 'LIST';
   let viewingPostId = null;
   let currentBoardId = null;
   let boards = [];
@@ -503,6 +504,47 @@
     }
   }
 
+  function resetBoardState() {
+    boardView = 'LIST';
+    viewingPostId = null;
+    closeWriteModal();
+    setBoardView('LIST');
+  }
+
+  function setBoardView(view) {
+    boardView = view;
+    const listEl = $('#board-list-view');
+    const detailEl = $('#board-detail-view');
+    if (listEl) listEl.classList.toggle('hidden', view !== 'LIST');
+    if (detailEl) detailEl.classList.toggle('hidden', view !== 'DETAIL');
+    if (view === 'LIST') {
+      viewingPostId = null;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  function openWriteModal() {
+    if (currentBoardId === 'notice') {
+      showToast('공지사항은 관리자만 작성할 수 있습니다.');
+      return;
+    }
+    const modal = $('#modal-board-write');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    lucide.createIcons();
+    $('#write-nick')?.focus();
+  }
+
+  function closeWriteModal() {
+    const modal = $('#modal-board-write');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    const anyOpen = [...document.querySelectorAll('.modal')].some((m) => !m.classList.contains('hidden'));
+    if (!anyOpen) document.body.style.overflow = '';
+    $('#board-write-form')?.reset();
+  }
+
   function selectBoard(boardId) {
     currentBoardId = boardId;
     const board = boards.find((b) => b.id === boardId);
@@ -513,9 +555,14 @@
       updateWriteCategorySelect(board.categories || []);
     }
     renderBoardTabs();
+    resetBoardState();
+    updateBoardWriteButton();
     subscribePosts(boardId);
-    viewingPostId = null;
-    $('#board-detail')?.classList.add('hidden');
+  }
+
+  function updateBoardWriteButton() {
+    const btn = $('#btn-board-write');
+    if (btn) btn.classList.toggle('hidden', currentBoardId === 'notice');
   }
 
   function subscribePosts(boardId) {
@@ -647,9 +694,8 @@
     }
     viewingPostId = id;
 
-    const detail = $('#board-detail');
     const content = $('#board-detail-content');
-    if (!detail || !content) return;
+    if (!content) return;
 
     const catClass = CAT_CLASS[post.cat] || 'cat-chat';
     const adminBtns = isAdmin ? `
@@ -661,9 +707,9 @@
       ${post.isNotice ? '<span class="post-notice-badge ml-1">공지</span>' : ''}
       <h2 class="board-post-title mt-2">${escapeHtml(post.title)}</h2>
       <div class="board-post-meta">
-        <span>✏️ ${escapeHtml(post.nick)}</span>
-        <span>📅 ${post.date || ''}</span>
-        <span>👁 ${(post.views || 0) + 1}</span>
+        <span>${escapeHtml(post.nick)}</span>
+        <span>${post.date || ''}</span>
+        <span>조회 ${(post.views || 0) + 1}</span>
       </div>
       <div class="board-post-body">${escapeHtml(post.body)}</div>
       ${adminBtns}
@@ -673,8 +719,8 @@
     $('#admin-delete-post')?.addEventListener('click', () => adminDeletePost(id));
 
     renderComments(post);
-    detail.classList.remove('hidden');
-    detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setBoardView('DETAIL');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function renderComments(post) {
@@ -697,7 +743,7 @@
             <span class="comment-time">${c.time || ''}</span>
             ${isAdmin ? `<button class="admin-comment-del text-xs text-red-500 font-bold ml-auto" data-idx="${idx}">삭제</button>` : ''}
           </div>
-          <p class="text-gray-700">${escapeHtml(c.body)}</p>
+          <p class="text-gray-400">${escapeHtml(c.body)}</p>
         </div>
       </div>
     `).join('');
@@ -711,6 +757,16 @@
   }
 
   function bindBoardEvents() {
+    $('#btn-board-write')?.addEventListener('click', openWriteModal);
+
+    $$('[data-close-board-write]').forEach((el) => {
+      el.addEventListener('click', closeWriteModal);
+    });
+
+    $$('[data-board-back]').forEach((btn) => {
+      btn.addEventListener('click', () => setBoardView('LIST'));
+    });
+
     $('#board-write-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const nick = $('#write-nick').value.trim() || '익명';
@@ -738,13 +794,8 @@
         saveLocalPosts();
         renderBoard();
       }
-      e.target.reset();
+      closeWriteModal();
       showToast('게시글이 등록되었습니다.');
-    });
-
-    $('#board-back-btn')?.addEventListener('click', () => {
-      viewingPostId = null;
-      $('#board-detail')?.classList.add('hidden');
     });
 
     $('#comment-form')?.addEventListener('submit', async (e) => {
@@ -922,7 +973,7 @@
       renderBoard();
     }
     viewingPostId = null;
-    $('#board-detail')?.classList.add('hidden');
+    setBoardView('LIST');
     showToast('게시글이 삭제되었습니다.');
   }
 
@@ -982,6 +1033,7 @@
   function closeAllModals() {
     $$('.modal').forEach((m) => m.classList.add('hidden'));
     document.body.style.overflow = '';
+    $('#board-write-form')?.reset();
   }
 
   // ═══════════════════ NAVIGATION ═══════════════════
@@ -1021,8 +1073,11 @@
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
     closeMobileMenu();
-    viewingPostId = null;
-    $('#board-detail')?.classList.add('hidden');
+    if (section !== 'board') {
+      resetBoardState();
+    } else if (boardView === 'DETAIL') {
+      setBoardView('LIST');
+    }
 
     if (section === 'toymarket' && subtab) {
       setToyMarketTab(subtab, false);
