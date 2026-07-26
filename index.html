@@ -65,7 +65,7 @@
           <a href="#toymarket" class="nav-link nav-pill" data-section="toymarket">토이마켓</a>
           <a href="#developer" class="nav-link nav-pill" data-section="developer">개발자센터</a>
           <a href="#resources" class="nav-link nav-pill" data-section="resources">자료실</a>
-          <a href="#admin" id="admin-nav-link" class="nav-link nav-pill admin-pill hidden" data-section="admin">관리자</a>
+          <a href="#admin" id="admin-nav-link" class="nav-link nav-pill admin-pill hidden" data-section="admin">슈퍼 관리자</a>
         </nav>
 
         <!-- Auth Area (Desktop) -->
@@ -93,7 +93,7 @@
       <a href="#toymarket" class="nav-link mobile-nav-item" data-section="toymarket">토이마켓</a>
       <a href="#developer" class="nav-link mobile-nav-item" data-section="developer">개발자센터</a>
       <a href="#resources" class="nav-link mobile-nav-item" data-section="resources">자료실</a>
-      <a href="#admin" id="admin-mobile-nav" class="nav-link mobile-nav-item hidden" data-section="admin">관리자</a>
+      <a href="#admin" id="admin-mobile-nav" class="nav-link mobile-nav-item hidden" data-section="admin">슈퍼 관리자</a>
       <div id="mobile-auth-guest" class="pt-3 border-t border-white/10 flex gap-2">
         <button id="btn-login-mobile" class="auth-btn auth-btn-outline flex-1 justify-center">로그인</button>
         <button id="btn-signup-mobile" class="auth-btn auth-btn-primary flex-1 justify-center">회원가입</button>
@@ -464,52 +464,45 @@
       </div>
     </section>
 
-    <!-- ═══════════════════ ADMIN DASHBOARD ═══════════════════ -->
+    <!-- ═══════════════════ SUPER ADMIN DASHBOARD ═══════════════════ -->
     <section id="admin" class="section section-surface">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <div class="section-header">
-          <span class="section-badge">Admin</span>
-          <h2 class="section-title">관리자 대시보드</h2>
-          <p class="section-desc">게시판 관리, 공지 작성, 콘텐츠 모더레이션</p>
-        </div>
-
-        <div class="grid lg:grid-cols-2 gap-6 mt-10">
-          <!-- Board management -->
-          <div class="admin-panel">
-            <h3 class="admin-panel-title"><i data-lucide="layout-grid" class="w-5 h-5"></i> 게시판 관리</h3>
-            <form id="admin-board-form" class="flex flex-col sm:flex-row gap-2 mb-4">
-              <input type="text" id="admin-board-name" class="form-input flex-1" placeholder="새 게시판 이름 (예: 질문답변)" maxlength="30" required />
-              <button type="submit" class="toy-btn-3d toy-btn-3d-sm justify-center whitespace-nowrap">+ 추가</button>
-            </form>
-            <div id="admin-board-list" class="space-y-2"></div>
+      <div class="sadmin-layout">
+        <aside class="sadmin-sidebar" id="sadmin-sidebar">
+          <div class="sadmin-sidebar-head">
+            <span class="sadmin-badge"><i data-lucide="shield-check" class="w-3 h-3"></i> Super Admin</span>
+            <h2 class="sadmin-title">ToyTools Control</h2>
+            <p class="sadmin-subtitle">서비스 전체 통제 센터</p>
           </div>
-
-          <!-- Notice write -->
-          <div class="admin-panel">
-            <h3 class="admin-panel-title"><i data-lucide="megaphone" class="w-5 h-5"></i> 공지사항 작성</h3>
-            <form id="admin-notice-form" class="space-y-3">
-              <div>
-                <label class="form-label" for="admin-notice-board">게시판</label>
-                <select id="admin-notice-board" class="form-input"></select>
-              </div>
-              <div>
-                <label class="form-label" for="admin-notice-title">제목</label>
-                <input type="text" id="admin-notice-title" class="form-input" placeholder="공지 제목" maxlength="80" required />
-              </div>
-              <div>
-                <label class="form-label" for="admin-notice-body">본문</label>
-                <textarea id="admin-notice-body" class="form-input min-h-[100px]" placeholder="공지 내용" required></textarea>
-              </div>
-              <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">공지 등록</button>
-            </form>
-          </div>
-        </div>
-
-        <div class="admin-panel mt-6">
-          <h3 class="admin-panel-title"><i data-lucide="trash-2" class="w-5 h-5"></i> 게시글 / 댓글 강제 삭제</h3>
-          <p class="text-sm text-gray-500 mb-4">게시판에서 글을 클릭하면 상세보기에서 [관리자 삭제] 버튼이 표시됩니다.</p>
-          <div id="admin-recent-posts" class="space-y-2"></div>
-        </div>
+          <nav class="sadmin-nav" id="sadmin-nav" aria-label="관리자 메뉴">
+            <button type="button" class="sadmin-nav-item active" data-sadmin-tab="overview">
+              <i data-lucide="layout-dashboard" class="w-4 h-4"></i> 개요 / 통계
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="marketplace">
+              <i data-lucide="store" class="w-4 h-4"></i> 토이마켓 관리
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="community">
+              <i data-lucide="messages-square" class="w-4 h-4"></i> 커뮤니티 관리
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="downloads">
+              <i data-lucide="folder-down" class="w-4 h-4"></i> 자료실 / 가이드
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="users">
+              <i data-lucide="users" class="w-4 h-4"></i> 유저 / 토이코인
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="developers">
+              <i data-lucide="code-2" class="w-4 h-4"></i> 개발자 / 정산
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="settings">
+              <i data-lucide="settings" class="w-4 h-4"></i> 시스템 설정
+            </button>
+          </nav>
+          <button type="button" class="sadmin-sidebar-exit" data-section="home">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i> 사이트로 돌아가기
+          </button>
+        </aside>
+        <main class="sadmin-main">
+          <div id="sadmin-content" class="sadmin-content"></div>
+        </main>
       </div>
     </section>
 
@@ -715,43 +708,95 @@
   </div>
 
   <!-- Board Write Modal -->
-  <div id="modal-board-write" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="modal-board-write" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="board-write-title">
     <div class="modal-backdrop" data-close-board-write></div>
-    <div class="modal-content max-w-lg">
+    <div class="modal-content board-write-modal">
       <button type="button" class="modal-close" data-close-board-write aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
-      <h2 class="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+      <h2 id="board-write-title" class="board-write-heading">
         <i data-lucide="pen-line" class="w-5 h-5 text-studio-accent"></i> 글쓰기
       </h2>
-      <form id="board-write-form" class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="form-label" for="write-nick">익명 닉네임</label>
-            <input type="text" id="write-nick" class="form-input" placeholder="익명" maxlength="12" required />
+      <form id="board-write-form" class="board-write-form">
+        <div class="board-write-meta">
+          <div class="board-write-meta-row">
+            <div>
+              <label class="form-label" for="write-nick">익명 닉네임</label>
+              <input type="text" id="write-nick" class="form-input" placeholder="익명" maxlength="12" required />
+            </div>
+            <div>
+              <label class="form-label" for="write-pw">비밀번호</label>
+              <input type="password" id="write-pw" class="form-input" placeholder="삭제용" maxlength="20" required />
+            </div>
+            <div>
+              <label class="form-label" for="write-cat">카테고리</label>
+              <select id="write-cat" class="form-input"></select>
+            </div>
           </div>
           <div>
-            <label class="form-label" for="write-pw">비밀번호</label>
-            <input type="password" id="write-pw" class="form-input" placeholder="삭제용" maxlength="20" required />
+            <label class="form-label" for="write-title">글 제목</label>
+            <input type="text" id="write-title" class="form-input" placeholder="제목을 입력하세요" maxlength="80" required />
           </div>
         </div>
-        <div>
-          <label class="form-label" for="write-cat">카테고리</label>
-          <select id="write-cat" class="form-input"></select>
+
+        <div class="board-write-editor-wrap">
+          <div class="board-write-toolbar">
+            <button type="button" id="btn-attach-image" class="write-toolbar-btn">
+              <i data-lucide="image-plus" class="w-4 h-4"></i> 이미지 첨부
+            </button>
+            <span class="write-toolbar-hint">또는 아래 영역에 이미지를 드래그하세요</span>
+            <input type="file" id="write-image-input" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden />
+          </div>
+
+          <div id="write-drop-zone" class="write-drop-zone">
+            <textarea id="write-body" class="write-body-input" placeholder="내용을 입력하세요. 이미지는 드래그 앤 드롭 또는 [이미지 첨부]로 추가할 수 있습니다." required></textarea>
+            <div class="write-drop-overlay" aria-hidden="true">
+              <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+              <span>이미지를 여기에 놓으세요</span>
+            </div>
+          </div>
+
+          <div id="write-image-preview" class="write-image-preview hidden"></div>
         </div>
-        <div>
-          <label class="form-label" for="write-title">글 제목</label>
-          <input type="text" id="write-title" class="form-input" placeholder="제목을 입력하세요" maxlength="80" required />
-        </div>
-        <div>
-          <label class="form-label" for="write-body">본문</label>
-          <textarea id="write-body" class="form-input min-h-[140px] resize-y" placeholder="내용을 입력하세요" required></textarea>
-        </div>
-        <div class="flex gap-2 pt-2">
-          <button type="button" class="btn-ghost flex-1 justify-center" data-close-board-write>취소</button>
-          <button type="submit" class="toy-btn-3d toy-btn-3d-sm flex-1 justify-center">
+
+        <div class="board-write-actions">
+          <button type="button" class="btn-ghost board-write-action-btn" data-close-board-write>취소</button>
+          <button type="button" id="btn-write-draft" class="btn-ghost board-write-action-btn">임시저장</button>
+          <button type="submit" class="toy-btn-3d toy-btn-3d-sm board-write-action-btn board-write-submit">
             <i data-lucide="send" class="w-4 h-4"></i> 등록하기
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Super Admin Confirm Modal -->
+  <div id="modal-sadmin-confirm" class="modal hidden" role="alertdialog" aria-modal="true">
+    <div class="modal-backdrop" data-sadmin-confirm-cancel></div>
+    <div class="modal-content max-w-md sadmin-confirm-modal">
+      <h2 id="sadmin-confirm-title" class="text-lg font-semibold text-white mb-2">확인</h2>
+      <p id="sadmin-confirm-message" class="text-sm text-gray-400 mb-6"></p>
+      <div class="flex gap-2 justify-end">
+        <button type="button" class="btn-ghost justify-center" data-sadmin-confirm-cancel>취소</button>
+        <button type="button" id="sadmin-confirm-ok" class="sadmin-btn-danger justify-center">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Super Admin User Detail Modal -->
+  <div id="modal-sadmin-user" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-sadmin-user-close></div>
+    <div class="modal-content max-w-lg">
+      <button type="button" class="modal-close" data-sadmin-user-close aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div id="sadmin-user-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Super Admin Item Edit Modal -->
+  <div id="modal-sadmin-item" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-sadmin-item-close></div>
+    <div class="modal-content max-w-lg">
+      <button type="button" class="modal-close" data-sadmin-item-close aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="text-lg font-semibold text-white mb-4">마켓 아이템 수정</h2>
+      <form id="sadmin-item-form" class="space-y-3"></form>
     </div>
   </div>
 
@@ -766,5 +811,6 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="app.js"></script>
+  <script src="admin-dashboard.js"></script>
 </body>
 </html>

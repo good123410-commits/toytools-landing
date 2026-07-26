@@ -39,6 +39,10 @@
   let tossPayments = null;
   let toymarketTab = 'skins';
   let resourcesTab = 'download';
+  let writeAttachments = [];
+
+  const WRITE_MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+  const WRITE_MAX_IMAGES = 8;
 
   const CAT_CLASS = {
     '잡담': 'cat-chat',
@@ -475,8 +479,7 @@
       boards = [...DEFAULT_BOARDS];
     }
     renderBoardTabs();
-    renderAdminBoardList();
-    updateAdminNoticeBoardSelect();
+    if (isAdmin) window.SuperAdmin?.renderPanel();
   }
 
   async function seedDefaultBoards() {
@@ -532,6 +535,7 @@
     if (!modal) return;
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    loadWriteDraft();
     lucide.createIcons();
     $('#write-nick')?.focus();
   }
@@ -543,6 +547,183 @@
     const anyOpen = [...document.querySelectorAll('.modal')].some((m) => !m.classList.contains('hidden'));
     if (!anyOpen) document.body.style.overflow = '';
     $('#board-write-form')?.reset();
+    clearWriteAttachments();
+  }
+
+  function clearWriteAttachments() {
+    writeAttachments = [];
+    const preview = $('#write-image-preview');
+    if (preview) {
+      preview.innerHTML = '';
+      preview.classList.add('hidden');
+    }
+    $('#write-drop-zone')?.classList.remove('drag-over');
+  }
+
+  function syncWriteAttachmentsFromBody() {
+    const body = $('#write-body')?.value || '';
+    const regex = /!\[([^\]]*)\]\((data:image\/[^)]+)\)/g;
+    writeAttachments = [];
+    let m;
+    while ((m = regex.exec(body)) !== null) {
+      writeAttachments.push({
+        id: `img_${writeAttachments.length}_${Date.now()}`,
+        name: m[1] || '이미지',
+        dataUrl: m[2],
+        markdown: m[0],
+      });
+    }
+    renderWriteImagePreviews();
+  }
+
+  function renderWriteImagePreviews() {
+    const container = $('#write-image-preview');
+    if (!container) return;
+    if (writeAttachments.length === 0) {
+      container.innerHTML = '';
+      container.classList.add('hidden');
+      return;
+    }
+    container.classList.remove('hidden');
+    container.innerHTML = writeAttachments.map((att) => `
+      <div class="write-preview-item" data-att-id="${att.id}">
+        <img src="${att.dataUrl}" alt="${escapeHtml(att.name)}" />
+        <button type="button" class="write-preview-remove" data-remove-att="${att.id}" aria-label="이미지 삭제">×</button>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-remove-att]').forEach((btn) => {
+      btn.addEventListener('click', () => removeWriteAttachment(btn.dataset.removeAtt));
+    });
+  }
+
+  function removeWriteAttachment(id) {
+    const att = writeAttachments.find((a) => a.id === id);
+    if (att?.markdown) {
+      const ta = $('#write-body');
+      if (ta) ta.value = ta.value.replace(att.markdown, '');
+    }
+    writeAttachments = writeAttachments.filter((a) => a.id !== id);
+    renderWriteImagePreviews();
+  }
+
+  function insertImageMarkdown(dataUrl, name) {
+    const ta = $('#write-body');
+    if (!ta) return '';
+    const safeName = name.replace(/[\[\]]/g, '');
+    const markdown = `\n![${safeName}](${dataUrl})\n`;
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    ta.value = ta.value.slice(0, start) + markdown + ta.value.slice(end);
+    const pos = start + markdown.length;
+    ta.selectionStart = ta.selectionEnd = pos;
+    ta.focus();
+    return markdown;
+  }
+
+  async function addWriteImages(fileList) {
+    const files = [...fileList].filter((f) => f.type.startsWith('image/'));
+    if (!files.length) {
+      showToast('이미지 파일만 첨부할 수 있습니다.');
+      return;
+    }
+    if (writeAttachments.length + files.length > WRITE_MAX_IMAGES) {
+      showToast(`이미지는 최대 ${WRITE_MAX_IMAGES}장까지 첨부할 수 있습니다.`);
+      return;
+    }
+
+    for (const file of files) {
+      if (file.size > WRITE_MAX_IMAGE_SIZE) {
+        showToast(`"${file.name}" — 이미지는 2MB 이하만 가능합니다.`);
+        continue;
+      }
+      const dataUrl = await readFileAsDataUrl(file);
+      const markdown = insertImageMarkdown(dataUrl, file.name);
+      writeAttachments.push({
+        id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: file.name,
+        dataUrl,
+        markdown,
+      });
+    }
+    renderWriteImagePreviews();
+    lucide.createIcons();
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function saveWriteDraft() {
+    if (!currentBoardId) return;
+    const draft = {
+      nick: $('#write-nick')?.value || '',
+      pw: $('#write-pw')?.value || '',
+      cat: $('#write-cat')?.value || '',
+      title: $('#write-title')?.value || '',
+      body: $('#write-body')?.value || '',
+      savedAt: Date.now(),
+    };
+    localStorage.setItem(`toytools_draft_${currentBoardId}`, JSON.stringify(draft));
+    showToast('임시저장되었습니다.');
+  }
+
+  function loadWriteDraft() {
+    clearWriteAttachments();
+    if (!currentBoardId) return;
+    try {
+      const raw = localStorage.getItem(`toytools_draft_${currentBoardId}`);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.nick != null) $('#write-nick').value = d.nick;
+      if (d.pw != null) $('#write-pw').value = d.pw;
+      if (d.cat != null && $('#write-cat')) $('#write-cat').value = d.cat;
+      if (d.title != null) $('#write-title').value = d.title;
+      if (d.body != null) $('#write-body').value = d.body;
+      syncWriteAttachmentsFromBody();
+    } catch (_) { /* ignore */ }
+  }
+
+  function clearWriteDraft() {
+    if (currentBoardId) {
+      localStorage.removeItem(`toytools_draft_${currentBoardId}`);
+    }
+  }
+
+  function bindWriteImageEvents() {
+    const input = $('#write-image-input');
+    const dropZone = $('#write-drop-zone');
+    const attachBtn = $('#btn-attach-image');
+
+    attachBtn?.addEventListener('click', () => input?.click());
+    input?.addEventListener('change', (e) => {
+      if (e.target.files?.length) addWriteImages(e.target.files);
+      e.target.value = '';
+    });
+
+    if (!dropZone) return;
+
+    ['dragenter', 'dragover'].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (evt === 'drop' && e.dataTransfer?.files?.length) {
+          addWriteImages(e.dataTransfer.files);
+        }
+        dropZone.classList.remove('drag-over');
+      });
+    });
   }
 
   function selectBoard(boardId) {
@@ -584,7 +765,7 @@
           return tb - ta;
         });
         renderBoard();
-        if (isAdmin) renderAdminRecentPosts();
+        if (isAdmin) window.SuperAdmin?.renderPanel();
       }, () => {
         posts = getLocalPosts(boardId);
         renderBoard();
@@ -711,7 +892,7 @@
         <span>${post.date || ''}</span>
         <span>조회 ${(post.views || 0) + 1}</span>
       </div>
-      <div class="board-post-body">${escapeHtml(post.body)}</div>
+      <div class="board-post-body">${renderPostBody(post.body)}</div>
       ${adminBtns}
     `;
     lucide.createIcons();
@@ -758,6 +939,9 @@
 
   function bindBoardEvents() {
     $('#btn-board-write')?.addEventListener('click', openWriteModal);
+    bindWriteImageEvents();
+
+    $('#btn-write-draft')?.addEventListener('click', saveWriteDraft);
 
     $$('[data-close-board-write]').forEach((el) => {
       el.addEventListener('click', closeWriteModal);
@@ -774,6 +958,10 @@
       const cat = $('#write-cat').value;
       const title = $('#write-title').value.trim();
       const body = $('#write-body').value.trim();
+      if (window.SuperAdmin?.isNickMuted(nick)) {
+        showToast('게시글 작성이 제한된 사용자입니다. (Mute/블랙리스트)');
+        return;
+      }
       if (!title || !body || !pw) { showToast('모든 필드를 입력해 주세요.'); return; }
 
       const postData = {
@@ -795,6 +983,7 @@
         renderBoard();
       }
       closeWriteModal();
+      clearWriteDraft();
       showToast('게시글이 등록되었습니다.');
     });
 
@@ -843,62 +1032,11 @@
         closeAllModals();
         updateAdminUI();
         navigateTo('admin');
-        showToast('관리자 모드가 활성화되었습니다.');
+        showToast('슈퍼 관리자 모드가 활성화되었습니다.');
         e.target.reset();
       } else {
         showToast('비밀번호가 올바르지 않습니다.');
       }
-    });
-
-    $('#admin-board-form')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const name = $('#admin-board-name').value.trim();
-      if (!name) return;
-      const id = 'board_' + Date.now();
-      const newBoard = { name, categories: ['일반'], order: boards.length + 1 };
-
-      if (firebaseReady && db) {
-        await db.collection('boards').doc(id).set(newBoard);
-      } else {
-        boards.push({ id, ...newBoard });
-      }
-      await loadBoards();
-      $('#admin-board-name').value = '';
-      showToast(`게시판 "${name}" 생성 완료`);
-    });
-
-    $('#admin-notice-form')?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const boardId = $('#admin-notice-board').value;
-      const title = $('#admin-notice-title').value.trim();
-      const body = $('#admin-notice-body').value.trim();
-      if (!title || !body) return;
-
-      const postData = {
-        boardId,
-        nick: '관리자',
-        pw: '',
-        cat: '공지',
-        title,
-        body,
-        date: formatDate(new Date()),
-        views: 0,
-        isNotice: true,
-        comments: [],
-        createdAt: firebaseReady ? firebase.firestore.FieldValue.serverTimestamp() : Date.now(),
-      };
-
-      if (firebaseReady && db) {
-        await db.collection('posts').add(postData);
-      } else {
-        if (boardId === currentBoardId) {
-          posts.unshift({ id: 'notice_' + Date.now(), ...postData });
-          saveLocalPosts();
-          renderBoard();
-        }
-      }
-      e.target.reset();
-      showToast('공지사항이 등록되었습니다.');
     });
   }
 
@@ -906,44 +1044,68 @@
     const show = isAdmin ? 'remove' : 'add';
     $('#admin-nav-link')?.classList[show]('hidden');
     $('#admin-mobile-nav')?.classList[show]('hidden');
-    if (isAdmin) renderAdminBoardList();
+    if (isAdmin) window.SuperAdmin?.renderPanel();
   }
 
-  function renderAdminBoardList() {
-    const container = $('#admin-board-list');
-    if (!container) return;
-    container.innerHTML = boards.map((b) => `
-      <div class="admin-board-item">
-        <span>📋 ${escapeHtml(b.name)} <span class="text-gray-400 text-xs">(${b.id})</span></span>
-        ${b.id !== 'notice' ? `<button data-delete-board="${b.id}">삭제</button>` : '<span class="text-xs text-gray-400">기본</span>'}
-      </div>
-    `).join('') || '<p class="text-sm text-gray-400">게시판이 없습니다.</p>';
+  async function adminCreateBoard(name) {
+    const id = 'board_' + Date.now();
+    const newBoard = { name, categories: ['일반'], order: boards.length + 1 };
+    if (firebaseReady && db) {
+      await db.collection('boards').doc(id).set(newBoard);
+    } else {
+      boards.push({ id, ...newBoard });
+    }
+    await loadBoards();
+    showToast(`게시판 "${name}" 생성 완료`);
+  }
 
-    container.querySelectorAll('[data-delete-board]').forEach((btn) => {
-      btn.addEventListener('click', () => adminDeleteBoard(btn.dataset.deleteBoard));
+  async function adminPostNotice({ boardId, title, body, pin = true }) {
+    if (!title || !body) return;
+    const postData = {
+      boardId,
+      nick: '관리자',
+      pw: '',
+      cat: '공지',
+      title,
+      body,
+      date: formatDate(new Date()),
+      views: 0,
+      isNotice: true,
+      pinned: pin,
+      comments: [],
+      createdAt: firebaseReady ? firebase.firestore.FieldValue.serverTimestamp() : Date.now(),
+    };
+    if (firebaseReady && db) {
+      await db.collection('posts').add(postData);
+    } else {
+      const raw = localStorage.getItem(`toytools_posts_${boardId}`);
+      const list = raw ? JSON.parse(raw) : [];
+      list.unshift({ id: 'notice_' + Date.now(), ...postData });
+      localStorage.setItem(`toytools_posts_${boardId}`, JSON.stringify(list));
+      if (boardId === currentBoardId) {
+        posts = list;
+        renderBoard();
+      }
+    }
+    showToast('공지사항이 등록되었습니다.');
+  }
+
+  function adminDeletePostsByNick(nick) {
+    const q = nick.trim().toLowerCase();
+    boards.forEach((b) => {
+      try {
+        const raw = localStorage.getItem(`toytools_posts_${b.id}`);
+        if (!raw) return;
+        const list = JSON.parse(raw).filter((p) => (p.nick || '').toLowerCase() !== q);
+        localStorage.setItem(`toytools_posts_${b.id}`, JSON.stringify(list));
+      } catch (_) { /* ignore */ }
     });
-  }
-
-  function updateAdminNoticeBoardSelect() {
-    const sel = $('#admin-notice-board');
-    if (!sel) return;
-    sel.innerHTML = boards.map((b) => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
-  }
-
-  function renderAdminRecentPosts() {
-    const container = $('#admin-recent-posts');
-    if (!container || !isAdmin) return;
-    const recent = posts.slice(0, 10);
-    container.innerHTML = recent.map((p) => `
-      <div class="admin-board-item">
-        <span class="truncate flex-1 mr-2">${p.isNotice ? '📢' : '💬'} ${escapeHtml(p.title)}</span>
-        <button data-admin-del-post="${p.id}">삭제</button>
-      </div>
-    `).join('') || '<p class="text-sm text-gray-400">게시글이 없습니다.</p>';
-
-    container.querySelectorAll('[data-admin-del-post]').forEach((btn) => {
-      btn.addEventListener('click', () => adminDeletePost(btn.dataset.adminDelPost));
-    });
+    if (currentBoardId) {
+      posts = posts.filter((p) => (p.nick || '').toLowerCase() !== q);
+      saveLocalPosts();
+      renderBoard();
+    }
+    showToast(`"${nick}" 닉네임의 게시글이 삭제되었습니다.`);
   }
 
   async function adminDeleteBoard(boardId) {
@@ -963,17 +1125,27 @@
     showToast('게시판이 삭제되었습니다.');
   }
 
-  async function adminDeletePost(postId) {
-    if (!confirm('이 게시글을 삭제하시겠습니까?')) return;
+  async function adminDeletePost(postId, boardId) {
+    const bid = boardId || currentBoardId;
     if (firebaseReady && db) {
       await db.collection('posts').doc(postId).delete();
-    } else {
+    } else if (bid === currentBoardId) {
       posts = posts.filter((p) => p.id !== postId);
       saveLocalPosts();
       renderBoard();
+    } else {
+      try {
+        const raw = localStorage.getItem(`toytools_posts_${bid}`);
+        if (raw) {
+          const list = JSON.parse(raw).filter((p) => p.id !== postId);
+          localStorage.setItem(`toytools_posts_${bid}`, JSON.stringify(list));
+        }
+      } catch (_) { /* ignore */ }
     }
-    viewingPostId = null;
-    setBoardView('LIST');
+    if (viewingPostId === postId) {
+      viewingPostId = null;
+      setBoardView('LIST');
+    }
     showToast('게시글이 삭제되었습니다.');
   }
 
@@ -1034,6 +1206,7 @@
     $$('.modal').forEach((m) => m.classList.add('hidden'));
     document.body.style.overflow = '';
     $('#board-write-form')?.reset();
+    clearWriteAttachments();
   }
 
   // ═══════════════════ NAVIGATION ═══════════════════
@@ -1093,8 +1266,9 @@
       updateDeveloperDashboard();
     }
     if (section === 'admin' && isAdmin) {
-      renderAdminBoardList();
-      renderAdminRecentPosts();
+      const tabs = ['overview', 'marketplace', 'community', 'downloads', 'users', 'developers', 'settings'];
+      const tab = subtab && tabs.includes(subtab) ? subtab : 'overview';
+      window.SuperAdmin?.setTab(tab, false);
     }
   }
 
@@ -1228,14 +1402,14 @@
     let items;
     let buyType;
     if (toymarketTab === 'games') {
-      items = MINIGAMES;
       buyType = 'game';
+      items = window.SuperAdmin?.getMarketCatalog('game') || MINIGAMES;
     } else if (toymarketTab === 'extensions') {
-      items = EXTENSIONS;
       buyType = 'extension';
+      items = window.SuperAdmin?.getMarketCatalog('extension') || EXTENSIONS;
     } else {
-      items = SKINS;
       buyType = 'skin';
+      items = window.SuperAdmin?.getMarketCatalog('skin') || SKINS;
     }
 
     const owned = userProfile?.ownedSkins || [];
@@ -1321,6 +1495,12 @@
     });
     $('#contact-form')?.addEventListener('submit', (e) => {
       e.preventDefault();
+      const email = $('#contact-email')?.value?.trim();
+      const subject = $('#contact-subject')?.value?.trim();
+      const body = $('#contact-body')?.value?.trim();
+      if (window.SuperAdmin) {
+        window.SuperAdmin.addInquiry({ email, subject, body });
+      }
       showToast('문의가 접수되었습니다. 1~2 영업일 내 답변드립니다.');
       e.target.reset();
     });
@@ -1356,7 +1536,8 @@
   function renderChangelog() {
     const container = $('#changelog-list');
     if (!container) return;
-    container.innerHTML = CHANGELOG.map((c) => `
+    const data = window.SuperAdmin?.getChangelog() || CHANGELOG;
+    container.innerHTML = data.map((c) => `
       <div class="changelog-item">
         <div><span class="changelog-version">${escapeHtml(c.version)}</span><span class="changelog-date">${c.date}</span></div>
         <p class="changelog-notes">${escapeHtml(c.notes)}</p>
@@ -1367,7 +1548,8 @@
   function renderFAQ() {
     const container = $('#faq-accordion');
     if (!container) return;
-    container.innerHTML = FAQ_ITEMS.map((f, i) => `
+    const data = window.SuperAdmin?.getFaq() || FAQ_ITEMS;
+    container.innerHTML = data.map((f, i) => `
       <div class="faq-item" data-faq="${i}">
         <button type="button" class="faq-question">
           <span>${escapeHtml(f.q)}</span>
@@ -1409,6 +1591,21 @@
         openModal('modal-login');
         return;
       }
+      const itemType = $('#dev-item-type')?.value;
+      const name = $('#dev-item-name')?.value?.trim();
+      const desc = $('#dev-item-desc')?.value?.trim();
+      const url = $('#dev-item-url')?.value?.trim();
+      if (window.SuperAdmin) {
+        window.SuperAdmin.addDevSubmission({
+          itemType,
+          type: itemType,
+          name,
+          desc,
+          url,
+          nick: userProfile?.nickname || currentUser?.email,
+          email: currentUser?.email,
+        });
+      }
       showToast('등록 신청이 접수되었습니다. 심사 후 연락드립니다.');
       e.target.reset();
     });
@@ -1435,15 +1632,23 @@
   }
 
   function bindDownloadBtn() {
-    const btn = $('#download-btn');
-    if (!btn) return;
-    btn.addEventListener('mousedown', () => btn.classList.add('pressed'));
-    btn.addEventListener('mouseup', () => btn.classList.remove('pressed'));
-    btn.addEventListener('mouseleave', () => btn.classList.remove('pressed'));
-    btn.addEventListener('click', (e) => {
+    const handleDownload = (e) => {
       e.preventDefault();
-      showToast('ToyTools v1.0 다운로드 준비 중입니다.');
-    });
+      window.SuperAdmin?.incrementDownloadCount();
+      const info = window.SuperAdmin?.getDownloadInfo?.();
+      if (info?.url && info.url !== '#') {
+        window.open(info.url, '_blank');
+      }
+      showToast(`${info?.version || 'ToyTools v1.0'} 다운로드를 시작합니다.`);
+    };
+    $('#download-btn')?.addEventListener('click', handleDownload);
+    $('#resources-download-btn')?.addEventListener('click', handleDownload);
+    const btn = $('#download-btn');
+    if (btn) {
+      btn.addEventListener('mousedown', () => btn.classList.add('pressed'));
+      btn.addEventListener('mouseup', () => btn.classList.remove('pressed'));
+      btn.addEventListener('mouseleave', () => btn.classList.remove('pressed'));
+    }
   }
 
   // ═══════════════════ UTILS ═══════════════════
@@ -1451,6 +1656,33 @@
     const el = document.createElement('div');
     el.textContent = str;
     return el.innerHTML;
+  }
+
+  function isSafeImageSrc(src) {
+    return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(src)
+      || /^https:\/\/[^\s"'<>]+$/i.test(src);
+  }
+
+  function renderPostBody(body) {
+    if (!body) return '';
+    const imgRe = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    let html = '';
+    let last = 0;
+    let m;
+    while ((m = imgRe.exec(body)) !== null) {
+      html += escapeHtml(body.slice(last, m.index)).replace(/\n/g, '<br>');
+      const alt = escapeHtml(m[1]);
+      const src = m[2];
+      if (isSafeImageSrc(src)) {
+        const safeSrc = src.replace(/"/g, '&quot;');
+        html += `<img src="${safeSrc}" alt="${alt}" class="post-inline-img" loading="lazy" />`;
+      } else {
+        html += escapeHtml(m[0]);
+      }
+      last = m.index + m[0].length;
+    }
+    html += escapeHtml(body.slice(last)).replace(/\n/g, '<br>');
+    return html;
   }
 
   function formatDate(d) {
@@ -1469,6 +1701,33 @@
     clearTimeout(showToast._timer);
     showToast._timer = setTimeout(() => toast.classList.add('hidden'), 3000);
   }
+
+  function closeModal(id) {
+    const modal = document.getElementById(id);
+    if (modal) modal.classList.add('hidden');
+    const anyOpen = [...document.querySelectorAll('.modal')].some((m) => !m.classList.contains('hidden'));
+    if (!anyOpen) document.body.style.overflow = '';
+  }
+
+  // ── Bridge for Super Admin Dashboard ──
+  window.ToyToolsBridge = {
+    $, $$, escapeHtml, showToast, formatDate, formatDateTime,
+    navigateTo,
+    openModal,
+    closeModal,
+    isAdmin: () => isAdmin,
+    getBoards: () => boards,
+    getChangelogDefault: () => CHANGELOG,
+    getFaqDefault: () => FAQ_ITEMS,
+    SKINS, MINIGAMES, EXTENSIONS,
+    adminPostNotice,
+    adminCreateBoard,
+    adminDeleteBoard,
+    adminDeletePost,
+    adminDeletePostsByNick,
+    renderToyMarket,
+    renderResources,
+  };
 
   // ── Boot ──
   if (document.readyState === 'loading') {
