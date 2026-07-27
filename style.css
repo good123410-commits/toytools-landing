@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════
    ToyTools — Professional Dark Studio UI
-   build: 20260727-auth-header-v4
+   build: 20260727-nav-fix-v5
    ═══════════════════════════════════════════ */
 
 .hidden { display: none !important; }
@@ -119,6 +119,23 @@ body {
 }
 
 /* ═══════════════════ NAVIGATION ═══════════════════ */
+.desktop-main-nav {
+  display: none;
+  align-items: center;
+  gap: 0.125rem;
+  flex: 1;
+  justify-content: center;
+  max-width: 48rem;
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
+@media (min-width: 1280px) {
+  .desktop-main-nav {
+    display: flex;
+  }
+}
+
 .nav-pill {
   padding: 0.45rem 0.85rem;
   border-radius: var(--radius-sm);
