@@ -19,6 +19,9 @@
     downloadsToday: 'toytools_downloads_today',
     devSubmissions: 'toytools_dev_submissions',
     extensions: 'toytools_extensions',
+    toysHome: 'toytools_home_toys',
+    devlogs: 'toytools_devlogs',
+    landing: 'toytools_landing',
   };
 
   let bridge = null;
@@ -42,6 +45,8 @@
     payouts: [],
     devSubmissions: [],
     extensions: [],
+    homeToys: [],
+    devlogs: [],
     settings: { maintenance: false, registrationOpen: true, marketOpen: true, notice: '' },
     download: { version: 'v1.0.0', url: '#', notes: 'Windows 10/11 · 포터블 .exe · 무설치' },
     blacklist: [],
@@ -49,7 +54,45 @@
     changelog: [],
     faq: [],
     dailyDownloads: { date: '', count: 0 },
+    landing: null,
   };
+
+  function buildDefaultLanding() {
+    return {
+      badge: 'v1.0 정식 출시 예정',
+      titleLine1: 'AI가 판치는 세상,',
+      titleAccent: '가장 가볍고 강력한',
+      titleLine2: '개발자·업무용 유틸리티 공장',
+      description: '복잡한 오픈소스 설정, 무거운 IDE, 끝없는 CLI.\nToyTools는 클릭 한 번으로 끝나는 프로급 생산성 스택입니다.',
+      descriptionHighlight: '클릭 한 번',
+      ctaLabel: 'ToyTools v1.0 무료 다운로드',
+      platformNote: 'Windows 10/11 • 포터블 .exe • 무설치',
+      mediaType: 'mockup',
+      mediaUrl: '',
+      mediaHtml: '',
+      stats: [
+        { value: '4+', label: '내장 유틸리티' },
+        { value: '3', label: '프로 테마' },
+        { value: '∞', label: '워크플로우' },
+        { value: '0₩', label: '기본 무료' },
+      ],
+    };
+  }
+
+  function mergeLanding(data) {
+    const defaults = buildDefaultLanding();
+    if (!data) return { ...defaults };
+    return {
+      ...defaults,
+      ...data,
+      stats: Array.isArray(data.stats) && data.stats.length
+        ? data.stats.map((s, i) => ({
+          value: s?.value ?? defaults.stats[i]?.value ?? '',
+          label: s?.label ?? defaults.stats[i]?.label ?? '',
+        }))
+        : defaults.stats,
+    };
+  }
 
   function lsLoad(key, fallback) {
     try {
@@ -127,6 +170,88 @@
 
   function mergeMarketCache() {
     cache.market = [...cache.skins, ...cache.toys];
+  }
+
+  function mapHomeToy(id, data) {
+    return {
+      id,
+      icon: pick(data, 'icon', 'emoji') || '🧩',
+      title: pick(data, 'title', 'name') || '장난감',
+      desc: pick(data, 'desc', 'description') || '',
+      tag: pick(data, 'tag', 'category') || '',
+      accent: pick(data, 'accent', 'color') || '#6366F1',
+      downloadUrl: pick(data, 'downloadUrl', 'downloadLink', 'url') || '',
+      downloadStatus: pick(data, 'downloadStatus', 'status') || 'available',
+      order: Number(data.order ?? 0),
+      active: data.active !== false,
+      createdAt: data.createdAt || null,
+      updatedAt: data.updatedAt || null,
+    };
+  }
+
+  function mapDevlog(id, data) {
+    return {
+      id,
+      emoji: pick(data, 'emoji', 'icon') || '📝',
+      title: pick(data, 'title') || '제목 없음',
+      author: pick(data, 'author', 'writer') || 'ToyTools',
+      category: pick(data, 'category', 'cat') || '기타',
+      body: pick(data, 'body', 'content') || '',
+      date: pick(data, 'date') || (data.createdAt ? fmtDate(data.createdAt) : '-'),
+      views: Number(data.views ?? 0),
+      comments: Number(data.comments ?? 0),
+      from: pick(data, 'from', 'thumbFrom') || '#FFE0EC',
+      to: pick(data, 'to', 'thumbTo') || '#E0F7FF',
+      order: Number(data.order ?? 0),
+      published: data.published !== false,
+      createdAt: data.createdAt || null,
+    };
+  }
+
+  function sortHomeToys() {
+    cache.homeToys.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }
+
+  function sortDevlogs() {
+    cache.devlogs.sort((a, b) => {
+      const da = a.date || '';
+      const db_ = b.date || '';
+      if (da !== db_) return db_.localeCompare(da);
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+  }
+
+  function buildDefaultHomeToys(B) {
+    return (B.getToysDefault?.() || []).map((t, i) => mapHomeToy(`toy_${i + 1}`, {
+      ...t,
+      order: i,
+      downloadUrl: '',
+      downloadStatus: 'available',
+      active: true,
+    }));
+  }
+
+  function buildDefaultDevlogs(B) {
+    return (B.getDevlogsDefault?.() || []).map((d, i) => mapDevlog(String(d.id ?? i + 1), {
+      emoji: d.emoji,
+      title: d.title,
+      author: 'ToyTools',
+      category: '개발 비하인드',
+      body: d.body,
+      date: d.date,
+      views: d.views || 0,
+      comments: d.comments || 0,
+      thumbFrom: d.from,
+      thumbTo: d.to,
+      order: i,
+      published: true,
+    }));
+  }
+
+  function assertAdmin() {
+    if (!bridge?.isAdmin?.()) {
+      throw new Error('슈퍼관리자 권한이 필요합니다.');
+    }
   }
 
   function skinToFirestore(item) {
@@ -225,6 +350,12 @@
     if (!lsLoad(LS.payouts, null)) lsSave(LS.payouts, cache.payouts);
 
     cache.devSubmissions = lsLoad(LS.devSubmissions, []);
+    cache.homeToys = lsLoad(LS.toysHome, null) || buildDefaultHomeToys(B);
+    if (!lsLoad(LS.toysHome, null)) lsSave(LS.toysHome, cache.homeToys);
+    cache.devlogs = lsLoad(LS.devlogs, null) || buildDefaultDevlogs(B);
+    if (!lsLoad(LS.devlogs, null)) lsSave(LS.devlogs, cache.devlogs);
+    sortHomeToys();
+    sortDevlogs();
     cache.settings = lsLoad(LS.settings, cache.settings);
     cache.download = lsLoad(LS.download, cache.download);
     cache.blacklist = lsLoad(LS.blacklist, []);
@@ -232,6 +363,7 @@
     cache.changelog = lsLoad(LS.changelog, B.getChangelogDefault());
     cache.faq = lsLoad(LS.faq, B.getFaqDefault());
     cache.dailyDownloads = lsLoad(LS.downloadsToday, { date: B.formatDate(new Date()), count: 42 });
+    cache.landing = mergeLanding(lsLoad(LS.landing, null));
     cache.posts = [];
   }
 
@@ -264,6 +396,60 @@
         changelog: bridge.getChangelogDefault(),
         faq: bridge.getFaqDefault(),
         dailyDownloads: { date: bridge.formatDate(new Date()), count: 0 },
+      });
+    }
+
+    const toysSnap = await db.collection('toys').limit(1).get();
+    if (toysSnap.empty) {
+      const batch = db.batch();
+      buildDefaultHomeToys(bridge).forEach((t) => {
+        batch.set(db.collection('toys').doc(t.id), {
+          title: t.title,
+          desc: t.desc,
+          tag: t.tag,
+          icon: t.icon,
+          accent: t.accent,
+          downloadUrl: t.downloadUrl || '',
+          downloadStatus: t.downloadStatus || 'available',
+          order: t.order,
+          active: true,
+          createdAt: fs.FieldValue.serverTimestamp(),
+          updatedAt: fs.FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    }
+
+    const devlogsSnap = await db.collection('devlogs').limit(1).get();
+    if (devlogsSnap.empty) {
+      const batch = db.batch();
+      buildDefaultDevlogs(bridge).forEach((d) => {
+        batch.set(db.collection('devlogs').doc(d.id), {
+          title: d.title,
+          author: d.author,
+          category: d.category,
+          emoji: d.emoji,
+          body: d.body,
+          date: d.date,
+          views: d.views,
+          comments: d.comments,
+          thumbFrom: d.from,
+          thumbTo: d.to,
+          order: d.order,
+          published: true,
+          createdAt: fs.FieldValue.serverTimestamp(),
+          updatedAt: fs.FieldValue.serverTimestamp(),
+        });
+      });
+      await batch.commit();
+    }
+
+    const landingRef = db.collection('settings').doc('landing');
+    const landingSnap = await landingRef.get();
+    if (!landingSnap.exists) {
+      await landingRef.set({
+        ...buildDefaultLanding(),
+        updatedAt: fs.FieldValue.serverTimestamp(),
       });
     }
   }
@@ -335,6 +521,26 @@
       db.collection('config').doc('site').onSnapshot((doc) => {
         applyConfigDoc(doc.exists ? doc.data() : null);
         notify();
+      }),
+      db.collection('toys').onSnapshot((snap) => {
+        cache.homeToys = snap.docs.map((d) => mapHomeToy(d.id, d.data()));
+        sortHomeToys();
+        notify();
+      }, (err) => {
+        console.error('[FirebaseStore] toys 구독 실패:', err);
+      }),
+      db.collection('devlogs').onSnapshot((snap) => {
+        cache.devlogs = snap.docs.map((d) => mapDevlog(d.id, d.data()));
+        sortDevlogs();
+        notify();
+      }, (err) => {
+        console.error('[FirebaseStore] devlogs 구독 실패:', err);
+      }),
+      db.collection('settings').doc('landing').onSnapshot((doc) => {
+        cache.landing = mergeLanding(doc.exists ? doc.data() : null);
+        notify();
+      }, (err) => {
+        console.error('[FirebaseStore] settings/landing 구독 실패:', err);
       }),
     );
   }
@@ -510,46 +716,111 @@
     }
   }
 
+  const UPLOAD_TIMEOUT_MS = 120000;
+
+  function withTimeout(promise, ms, message) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  }
+
   async function uploadExtensionFile(file, uid) {
     const storage = bridge?.getStorage?.();
     if (!storage || !ready) {
-      throw new Error('Firebase Storage가 설정되지 않았습니다.');
+      const err = new Error('Firebase Storage가 설정되지 않았습니다.');
+      console.error('[FirebaseStore] uploadExtensionFile:', err);
+      throw err;
+    }
+    if (!file?.name?.toLowerCase().endsWith('.py')) {
+      const err = new Error('.py 파일만 업로드할 수 있습니다.');
+      console.error('[FirebaseStore] uploadExtensionFile:', err);
+      throw err;
     }
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const path = `extensions/${uid}/${Date.now()}_${safeName}`;
     const ref = storage.ref(path);
-    const snapshot = await ref.put(file, {
-      contentType: 'text/x-python',
-      customMetadata: { uploadedBy: uid },
-    });
-    return snapshot.ref.getDownloadURL();
+    try {
+      const uploadTask = ref.put(file, {
+        contentType: 'text/x-python',
+        customMetadata: { uploadedBy: uid },
+      });
+      const snapshot = await withTimeout(
+        uploadTask,
+        UPLOAD_TIMEOUT_MS,
+        '파일 업로드 시간이 초과되었습니다. 네트워크를 확인해 주세요.'
+      );
+      return await snapshot.ref.getDownloadURL();
+    } catch (err) {
+      console.error('[FirebaseStore] uploadExtensionFile 실패:', path, err);
+      throw err;
+    }
   }
 
   async function addExtensionPack(data) {
-    const item = {
-      name: data.name,
-      desc: data.desc,
-      price: Number(data.price) || 0,
-      category: data.category,
-      fileUrl: data.fileUrl,
-      author: data.author,
-      approved: false,
-      createdAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
-    };
-    if (ready && db) {
-      const docRef = await db.collection('extensions').add(item);
-      return docRef.id;
+    try {
+      const item = {
+        name: data.name,
+        desc: data.desc,
+        price: Number(data.price) || 0,
+        category: data.category,
+        fileUrl: data.fileUrl || '',
+        author: data.author || '',
+        authorUid: data.authorUid || '',
+        approved: false,
+        createdAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
+      };
+      if (ready && db) {
+        const docRef = await db.collection('extensions').add(item);
+        notify();
+        return docRef.id;
+      }
+      const id = 'ext_' + Date.now();
+      cache.extensions.unshift({ ...item, id });
+      lsSave(LS.extensions, cache.extensions);
+      notify();
+      return id;
+    } catch (err) {
+      console.error('[FirebaseStore] addExtensionPack 실패:', err);
+      throw err;
     }
-    const id = 'ext_' + Date.now();
-    cache.extensions.unshift({ ...item, id });
-    lsSave(LS.extensions, cache.extensions);
-    notify();
-    return id;
   }
 
   async function uploadExtensionPack({ name, category, desc, price, file, author, uid }) {
-    const fileUrl = await uploadExtensionFile(file, uid);
-    return addExtensionPack({ name, category, desc, price, fileUrl, author });
+    if (!uid) {
+      const err = new Error('로그인이 필요합니다.');
+      console.error('[FirebaseStore] uploadExtensionPack:', err);
+      throw err;
+    }
+    try {
+      let fileUrl = '';
+      try {
+        fileUrl = await uploadExtensionFile(file, uid);
+      } catch (storageErr) {
+        console.error('[FirebaseStore] Storage 업로드 실패:', storageErr);
+        throw new Error(storageErr.message || '파일 업로드에 실패했습니다.');
+      }
+      try {
+        return await addExtensionPack({
+          name, category, desc, price, fileUrl, author, authorUid: uid,
+        });
+      } catch (firestoreErr) {
+        console.error('[FirebaseStore] Firestore extensions 저장 실패:', firestoreErr);
+        throw new Error(firestoreErr.message || '확장팩 정보 저장에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('[FirebaseStore] uploadExtensionPack 실패:', err);
+      throw err;
+    }
+  }
+
+  function getExtensionsByUid(uid) {
+    if (!uid) return [];
+    return cache.extensions.filter(
+      (ext) => ext.authorUid === uid || (ext.author && String(ext.author).includes(uid))
+    );
   }
 
   async function updateDevSubmission(id, data) {
@@ -570,6 +841,137 @@
       const p = cache.payouts.find((x) => x.id === id);
       if (p) Object.assign(p, data);
       lsSave(LS.payouts, cache.payouts);
+      notify();
+    }
+  }
+
+  async function upsertHomeToy(item) {
+    assertAdmin();
+    const id = item.id || `toy_${Date.now()}`;
+    const payload = {
+      title: item.title || '',
+      desc: item.desc || '',
+      tag: item.tag || '',
+      icon: item.icon || '🧩',
+      accent: item.accent || '#6366F1',
+      downloadUrl: item.downloadUrl || '',
+      downloadStatus: item.downloadStatus || 'available',
+      order: Number(item.order ?? cache.homeToys.length),
+      active: item.active !== false,
+      updatedAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
+    };
+    if (!item.id && ready && fs) {
+      payload.createdAt = fs.FieldValue.serverTimestamp();
+    }
+    const mapped = mapHomeToy(id, { ...item, ...payload });
+    const idx = cache.homeToys.findIndex((t) => t.id === id);
+    if (idx >= 0) cache.homeToys[idx] = mapped;
+    else cache.homeToys.push(mapped);
+    sortHomeToys();
+
+    if (ready && db) {
+      await db.collection('toys').doc(id).set(payload, { merge: true });
+    } else {
+      lsSave(LS.toysHome, cache.homeToys);
+      notify();
+    }
+  }
+
+  async function deleteHomeToy(id) {
+    assertAdmin();
+    cache.homeToys = cache.homeToys.filter((t) => t.id !== id);
+    if (ready && db) {
+      await db.collection('toys').doc(id).delete();
+    } else {
+      lsSave(LS.toysHome, cache.homeToys);
+      notify();
+    }
+  }
+
+  async function upsertDevlog(item) {
+    assertAdmin();
+    const id = item.id || `devlog_${Date.now()}`;
+    const payload = {
+      title: item.title || '',
+      author: item.author || 'ToyTools',
+      category: item.category || '기타',
+      emoji: item.emoji || '📝',
+      body: item.body || '',
+      date: item.date || bridge.formatDate(new Date()),
+      views: Number(item.views ?? 0),
+      comments: Number(item.comments ?? 0),
+      thumbFrom: item.from || item.thumbFrom || '#FFE0EC',
+      thumbTo: item.to || item.thumbTo || '#E0F7FF',
+      order: Number(item.order ?? cache.devlogs.length),
+      published: item.published !== false,
+      updatedAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
+    };
+    if (!item.id && ready && fs) {
+      payload.createdAt = fs.FieldValue.serverTimestamp();
+    }
+    const mapped = mapDevlog(id, payload);
+    const idx = cache.devlogs.findIndex((d) => d.id === id);
+    if (idx >= 0) cache.devlogs[idx] = mapped;
+    else cache.devlogs.push(mapped);
+    sortDevlogs();
+
+    if (ready && db) {
+      await db.collection('devlogs').doc(id).set(payload, { merge: true });
+    } else {
+      lsSave(LS.devlogs, cache.devlogs);
+      notify();
+    }
+  }
+
+  async function saveLanding(data) {
+    assertAdmin();
+    const payload = mergeLanding(data);
+    cache.landing = payload;
+    if (ready && db) {
+      await db.collection('settings').doc('landing').set({
+        ...payload,
+        updatedAt: fs ? fs.FieldValue.serverTimestamp() : Date.now(),
+      }, { merge: true });
+    } else {
+      lsSave(LS.landing, payload);
+      notify();
+    }
+  }
+
+  async function uploadLandingMedia(file, uid) {
+    const storage = bridge?.getStorage?.();
+    if (!storage || !ready) {
+      const err = new Error('Firebase Storage가 설정되지 않았습니다.');
+      console.error('[FirebaseStore] uploadLandingMedia:', err);
+      throw err;
+    }
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `landing/${uid || 'admin'}_${Date.now()}_${safeName}`;
+    const ref = storage.ref(path);
+    try {
+      const uploadTask = ref.put(file, {
+        contentType: file.type || 'application/octet-stream',
+        customMetadata: { uploadedBy: uid || 'admin' },
+      });
+      const snapshot = await withTimeout(
+        uploadTask,
+        UPLOAD_TIMEOUT_MS,
+        '미디어 업로드 시간이 초과되었습니다.'
+      );
+      return await snapshot.ref.getDownloadURL();
+    } catch (err) {
+      console.error('[FirebaseStore] uploadLandingMedia 실패:', path, err);
+      throw err;
+    }
+  }
+
+  async function deleteDevlog(id) {
+    assertAdmin();
+    cache.devlogs = cache.devlogs.filter((d) => d.id !== id);
+    if (ready && db) {
+      await db.collection('devlogs').doc(id).delete();
+    } else {
+      lsSave(LS.devlogs, cache.devlogs);
       notify();
     }
   }
@@ -622,6 +1024,9 @@
     getPayouts: () => cache.payouts,
     getDevSubmissions: () => cache.devSubmissions,
     getExtensions: () => cache.extensions,
+    getExtensionsByUid,
+    getHomeToys: () => cache.homeToys,
+    getDevlogs: () => cache.devlogs,
     getSettings: () => cache.settings,
     getDownload: () => cache.download,
     getBlacklist: () => cache.blacklist,
@@ -629,6 +1034,10 @@
     getChangelog: () => cache.changelog,
     getFaq: () => cache.faq,
     getDailyDownloads: () => cache.dailyDownloads,
+    getLanding: () => cache.landing || mergeLanding(null),
+    getDefaultLanding: buildDefaultLanding,
+    saveLanding,
+    uploadLandingMedia,
     saveConfig,
     upsertMarketItem,
     deleteMarketItem,
@@ -640,6 +1049,10 @@
     updateDevSubmission,
     uploadExtensionPack,
     addExtensionPack,
+    upsertHomeToy,
+    deleteHomeToy,
+    upsertDevlog,
+    deleteDevlog,
     updatePayout,
     incrementDownloadCount,
   };

@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const BUILD = '20260727-auth-header-v4';
+  const BUILD = '20260727-about-menu-v7';
 
   function assertHttpOrigin() {
     if (window.location.protocol === 'file:') {
@@ -63,6 +63,7 @@
   let selectedChargeAmount = 0;
   let tossPayments = null;
   let toymarketTab = 'skins';
+  let aboutTab = 'vision';
   let resourcesTab = 'download';
   let writeAttachments = [];
 
@@ -183,12 +184,14 @@
     bindMyPageUI();
     bindChargeUI();
     bindAdminUI();
-    renderToyCards();
     renderDevLogs();
+    renderToyCards();
+    renderHero();
     renderToyMarket();
     renderResources();
     bindToyMarketTabs();
     bindResourcesTabs();
+    bindAboutTabs();
     bindDeveloperCenter();
     bindFooterNav();
     bindNavigation();
@@ -203,6 +206,9 @@
     updateAdminUI();
 
     await setupDataStore();
+    renderToyCards();
+    renderDevLogs();
+    renderHero();
     await loadBoards();
     if (boards.length > 0) {
       selectBoard(boards[0].id);
@@ -341,6 +347,8 @@
       getBoards: () => boards,
       getChangelogDefault: () => CHANGELOG,
       getFaqDefault: () => FAQ_ITEMS,
+      getToysDefault: () => TOYS,
+      getDevlogsDefault: () => DEVLOGS,
       SKINS, MINIGAMES, EXTENSIONS,
       adminPostNotice,
       adminCreateBoard,
@@ -349,9 +357,16 @@
       adminDeletePostsByNick,
       renderToyMarket,
       renderResources,
+      renderDevLogs,
+      renderToyCards,
+      renderHero,
       onDataChange: () => {
         renderToyMarket();
         renderResources();
+        renderDevLogs();
+        renderToyCards();
+        renderHero();
+        updateDeveloperDashboard();
         if (isAdmin) window.SuperAdmin?.renderPanel?.();
       },
     };
@@ -1608,12 +1623,14 @@
   }
 
   // ═══════════════════ NAVIGATION ═══════════════════
-  const VALID_SECTIONS = ['home', 'toys', 'devlog', 'board', 'toymarket', 'developer', 'resources', 'admin'];
-  const HASH_ALIASES = { skins: 'toymarket' };
+  const VALID_SECTIONS = ['home', 'about', 'board', 'toymarket', 'developer', 'resources', 'admin'];
+  const HASH_ALIASES = { skins: 'toymarket', toys: 'about', devlog: 'about' };
 
   function parseHash() {
     const raw = window.location.hash.replace('#', '') || 'home';
     const [section, subtab] = raw.split('.');
+    if (section === 'devlog') return { section: 'about', subtab: subtab || 'devlog' };
+    if (section === 'toys') return { section: 'about', subtab: subtab || 'vision' };
     const resolved = HASH_ALIASES[section] || section;
     return { section: resolved, subtab };
   }
@@ -1663,8 +1680,13 @@
     if (section === 'developer') {
       updateDeveloperDashboard();
     }
+    if (section === 'about') {
+      const tabs = ['vision', 'devlog', 'info'];
+      const tab = subtab && tabs.includes(subtab) ? subtab : 'vision';
+      setAboutTab(tab, false);
+    }
     if (section === 'admin' && isAdmin) {
-      const tabs = ['overview', 'marketplace', 'community', 'downloads', 'users', 'developers', 'settings'];
+      const tabs = ['overview', 'landing', 'toys', 'devlogs', 'marketplace', 'community', 'downloads', 'users', 'developers', 'settings'];
       const tab = subtab && tabs.includes(subtab) ? subtab : 'overview';
       window.SuperAdmin?.setTab(tab, false);
     }
@@ -1693,6 +1715,10 @@
     $$('[data-footer-nav]').forEach((btn) => {
       btn.addEventListener('click', () => navigateTo(btn.dataset.footerNav));
     });
+    $('#about-contact-btn')?.addEventListener('click', () => {
+      navigateTo('resources', 'qna');
+      setTimeout(() => $('#contact-email')?.focus(), 300);
+    });
     $('#footer-contact-btn')?.addEventListener('click', () => {
       navigateTo('resources', 'qna');
       setTimeout(() => $('#contact-email')?.focus(), 300);
@@ -1714,11 +1740,147 @@
   }
 
   // ═══════════════════ RENDER HELPERS ═══════════════════
+  function getLandingConfig() {
+    const FS = window.FirebaseStore;
+    const defaults = FS?.getDefaultLanding?.() || {
+      badge: 'v1.0 정식 출시 예정',
+      titleLine1: 'AI가 판치는 세상,',
+      titleAccent: '가장 가볍고 강력한',
+      titleLine2: '개발자·업무용 유틸리티 공장',
+      description: '복잡한 오픈소스 설정, 무거운 IDE, 끝없는 CLI.\nToyTools는 클릭 한 번으로 끝나는 프로급 생산성 스택입니다.',
+      descriptionHighlight: '클릭 한 번',
+      ctaLabel: 'ToyTools v1.0 무료 다운로드',
+      platformNote: 'Windows 10/11 • 포터블 .exe • 무설치',
+      mediaType: 'mockup',
+      mediaUrl: '',
+      mediaHtml: '',
+      stats: [
+        { value: '4+', label: '내장 유틸리티' },
+        { value: '3', label: '프로 테마' },
+        { value: '∞', label: '워크플로우' },
+        { value: '0₩', label: '기본 무료' },
+      ],
+    };
+    const saved = FS?.getLanding?.();
+    if (!saved) return defaults;
+    return {
+      ...defaults,
+      ...saved,
+      stats: saved.stats?.length ? saved.stats : defaults.stats,
+    };
+  }
+
+  function formatHeroDescription(desc, highlight) {
+    const text = escapeHtml(desc || '').replace(/\n/g, '<br class="hidden sm:block" />');
+    if (!highlight) return text;
+    const safeHighlight = escapeHtml(highlight);
+    return text.replace(safeHighlight, `<strong class="text-white font-semibold">${safeHighlight}</strong>`);
+  }
+
+  function renderHeroVisual(cfg) {
+    const mockup = $('#hero-visual-mockup');
+    const custom = $('#hero-visual-custom');
+    if (!mockup || !custom) return;
+
+    const type = cfg.mediaType || 'mockup';
+    if (type === 'mockup') {
+      mockup.classList.remove('hidden');
+      custom.classList.add('hidden');
+      custom.innerHTML = '';
+      return;
+    }
+
+    mockup.classList.add('hidden');
+    custom.classList.remove('hidden');
+    custom.innerHTML = '';
+
+    if (type === 'image' && cfg.mediaUrl && isSafeImageSrc(cfg.mediaUrl)) {
+      custom.innerHTML = `<img src="${escapeHtml(cfg.mediaUrl)}" alt="Hero visual" class="hero-visual-img" loading="lazy" />`;
+      return;
+    }
+    if (type === 'video' && cfg.mediaUrl && /^https:\/\//i.test(cfg.mediaUrl)) {
+      custom.innerHTML = `<video src="${escapeHtml(cfg.mediaUrl)}" class="hero-visual-video" autoplay muted loop playsinline></video>`;
+      return;
+    }
+    if (type === 'html' && cfg.mediaHtml) {
+      custom.innerHTML = cfg.mediaHtml;
+      return;
+    }
+
+    mockup.classList.remove('hidden');
+    custom.classList.add('hidden');
+  }
+
+  function renderHero() {
+    const cfg = getLandingConfig();
+
+    const badge = $('#hero-badge-text');
+    const line1 = $('#hero-title-line1');
+    const accent = $('#hero-title-accent');
+    const line2 = $('#hero-title-line2');
+    const desc = $('#hero-desc');
+    const cta = $('#hero-cta-label');
+    const platform = $('#hero-platform-note');
+
+    if (badge && cfg.badge) badge.textContent = cfg.badge;
+    if (line1 && cfg.titleLine1) line1.textContent = cfg.titleLine1;
+    if (accent && cfg.titleAccent) accent.textContent = cfg.titleAccent;
+    if (line2 && cfg.titleLine2) line2.textContent = cfg.titleLine2;
+    if (desc && cfg.description) {
+      desc.innerHTML = formatHeroDescription(cfg.description, cfg.descriptionHighlight);
+    }
+    if (cta && cfg.ctaLabel) cta.textContent = cfg.ctaLabel;
+    if (platform && cfg.platformNote) {
+      const monitorIcon = platform.querySelector('[data-lucide="monitor"]')
+        || platform.querySelector('i');
+      platform.innerHTML = '';
+      if (monitorIcon) {
+        platform.appendChild(monitorIcon);
+        platform.append(` ${cfg.platformNote}`);
+      } else {
+        platform.textContent = cfg.platformNote;
+      }
+    }
+
+    const stats = cfg.stats || [];
+    stats.forEach((stat, i) => {
+      const card = document.querySelector(`[data-hero-stat="${i}"]`);
+      if (!card) return;
+      const num = card.querySelector('.stat-num');
+      const label = card.querySelector('.stat-label');
+      if (num && stat.value != null) num.textContent = stat.value;
+      if (label && stat.label) label.textContent = stat.label;
+    });
+
+    renderHeroVisual(cfg);
+  }
+
+  function getHomeToysList() {
+    const FS = window.FirebaseStore;
+    if (FS?.isReady?.()) {
+      return FS.getHomeToys().filter((t) => t.active !== false);
+    }
+    return TOYS;
+  }
+
+  function getDevlogsList() {
+    const FS = window.FirebaseStore;
+    if (FS?.isReady?.()) {
+      return FS.getDevlogs().filter((d) => d.published !== false);
+    }
+    return DEVLOGS.map((d) => ({ ...d, id: String(d.id) }));
+  }
+
   function renderToyCards() {
     const container = $('#toy-cards');
     if (!container) return;
-    container.innerHTML = TOYS.map((t) => `
-      <div class="toy-card" style="--card-accent:${t.accent}">
+    const toys = getHomeToysList();
+    if (!toys.length) {
+      container.innerHTML = '<p class="text-sm text-gray-400 col-span-full text-center py-8">등록된 장난감이 없습니다.</p>';
+      return;
+    }
+    container.innerHTML = toys.map((t) => `
+      <div class="toy-card" style="--card-accent:${t.accent || '#6366F1'}">
         <span class="toy-card-icon">${t.icon}</span>
         <h3 class="toy-card-title">${escapeHtml(t.title)}</h3>
         <p class="toy-card-desc">${escapeHtml(t.desc)}</p>
@@ -1730,26 +1892,31 @@
   function renderDevLogs() {
     const container = $('#devlog-list');
     if (!container) return;
-    container.innerHTML = DEVLOGS.map((d) => `
-      <article class="devlog-card" data-id="${d.id}">
+    const logs = getDevlogsList();
+    if (!logs.length) {
+      container.innerHTML = '<p class="text-sm text-gray-400 col-span-full text-center py-8">등록된 개발일지가 없습니다.</p>';
+      return;
+    }
+    container.innerHTML = logs.map((d) => `
+      <article class="devlog-card" data-id="${escapeHtml(String(d.id))}">
         <div class="devlog-card-thumb" style="--thumb-from:${d.from};--thumb-to:${d.to}">${d.emoji}</div>
         <div class="devlog-card-body">
           <h3 class="devlog-card-title">${escapeHtml(d.title)}</h3>
           <div class="devlog-card-meta">
-            <span>📅 ${d.date}</span>
-            <span>👁 ${d.views.toLocaleString()}</span>
-            <span>💬 ${d.comments}</span>
+            <span>📅 ${escapeHtml(d.date)}</span>
+            <span>👁 ${Number(d.views || 0).toLocaleString()}</span>
+            <span>💬 ${Number(d.comments || 0)}</span>
           </div>
         </div>
       </article>
     `).join('');
     container.querySelectorAll('.devlog-card').forEach((card) => {
-      card.addEventListener('click', () => openDevlogModal(Number(card.dataset.id)));
+      card.addEventListener('click', () => openDevlogModal(card.dataset.id));
     });
   }
 
   function openDevlogModal(id) {
-    const post = DEVLOGS.find((d) => d.id === id);
+    const post = getDevlogsList().find((d) => String(d.id) === String(id));
     if (!post) return;
     const body = $('#devlog-modal-body');
     if (!body) return;
@@ -1757,11 +1924,13 @@
       <div class="text-4xl mb-4">${post.emoji}</div>
       <h2 class="text-xl sm:text-2xl font-semibold text-white mb-3">${escapeHtml(post.title)}</h2>
       <div class="flex flex-wrap gap-4 text-sm text-gray-400 mb-6">
-        <span>📅 ${post.date}</span>
-        <span>👁 ${post.views.toLocaleString()}</span>
-        <span>💬 ${post.comments}</span>
+        <span>📅 ${escapeHtml(post.date)}</span>
+        <span>${escapeHtml(post.category || '')}</span>
+        <span>✍️ ${escapeHtml(post.author || 'ToyTools')}</span>
+        <span>👁 ${Number(post.views || 0).toLocaleString()}</span>
+        <span>💬 ${Number(post.comments || 0)}</span>
       </div>
-      <div class="board-post-body text-base leading-relaxed">${escapeHtml(post.body)}</div>
+      <div class="board-post-body text-base leading-relaxed">${escapeHtml(post.body).replace(/\n/g, '<br>')}</div>
     `;
     openModal('devlog-modal');
   }
@@ -1774,6 +1943,32 @@
   }
 
   function renderSkinCards() { renderToyMarket(); }
+
+  function bindAboutTabs() {
+    $$('[data-about-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => setAboutTab(btn.dataset.aboutTab));
+    });
+    setAboutTab(aboutTab, false);
+  }
+
+  function setAboutTab(tab, updateHash = true) {
+    aboutTab = tab;
+    $$('[data-about-tab]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.aboutTab === tab);
+    });
+    $$('.about-panel').forEach((panel) => panel.classList.add('hidden'));
+    const panel = tab === 'devlog'
+      ? document.getElementById('devlogs')
+      : document.getElementById(`about-panel-${tab}`);
+    panel?.classList.remove('hidden');
+    if (tab === 'devlog') renderDevLogs();
+    if (tab === 'vision') renderToyCards();
+    if (updateHash) {
+      const h = buildHash('about', tab === 'vision' ? null : tab);
+      if (window.location.hash.replace('#', '') !== h) window.location.hash = h;
+    }
+    lucide.createIcons();
+  }
 
   function bindToyMarketTabs() {
     $$('[data-toymarket-tab]').forEach((btn) => {
@@ -1987,6 +2182,131 @@
     `).join('');
   }
 
+  const DEV_CATEGORY_LABELS = {
+    productivity: '생산성',
+    data: '데이터',
+    media: '미디어',
+    utility: '유틸리티',
+    automation: '자동화',
+  };
+
+  const SAMPLE_EXTENSION_PY = `# ToyTools Sample Extension
+# 확장팩 개발 템플릿 — 이 파일을 복사해 기능을 구현하세요.
+
+def get_metadata():
+    return {
+        "name": "My Extension",
+        "version": "1.0.0",
+        "description": "샘플 확장팩",
+    }
+
+def run(context):
+    """ToyTools에서 호출하는 메인 진입점"""
+    context.log("Hello from ToyTools!")
+    return {"ok": True}
+`;
+
+  let devUploading = false;
+
+  function setDevSubmitLoading(loading) {
+    const btn = $('#dev-submit-btn');
+    const label = $('#dev-submit-btn-label');
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.classList.toggle('is-loading', loading);
+    if (label) {
+      label.textContent = loading
+        ? '업로드 중...'
+        : (btn.dataset.defaultLabel || '확장팩 업로드');
+    }
+  }
+
+  function resetDevFileInput() {
+    const fileInput = $('#dev-item-file');
+    const fileNameEl = $('#dev-file-name');
+    const dropZone = $('#dev-file-drop');
+    if (fileInput) fileInput.value = '';
+    if (fileNameEl) {
+      fileNameEl.textContent = '';
+      fileNameEl.classList.add('hidden');
+    }
+    dropZone?.classList.remove('has-file');
+  }
+
+  function getMyExtensions() {
+    if (!currentUser || !window.FirebaseStore) return [];
+    if (typeof window.FirebaseStore.getExtensionsByUid === 'function') {
+      return window.FirebaseStore.getExtensionsByUid(currentUser.uid);
+    }
+    return (window.FirebaseStore.getExtensions() || []).filter(
+      (ext) => ext.authorUid === currentUser.uid
+        || (ext.author && String(ext.author).includes(currentUser.uid))
+    );
+  }
+
+  function downloadSampleExtension() {
+    try {
+      const blob = new Blob([SAMPLE_EXTENSION_PY], { type: 'text/x-python;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'toytools_sample_extension.py';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showToast('샘플 확장팩 파일을 다운로드했습니다.');
+    } catch (err) {
+      console.error('[ToyTools] 샘플 파일 다운로드 실패:', err);
+      showToast('샘플 파일 다운로드에 실패했습니다.');
+    }
+  }
+
+  function renderMyExtensionsList() {
+    const container = $('#dev-my-extensions-list');
+    if (!container) return;
+
+    if (!currentUser) {
+      container.innerHTML = '<p class="dev-ext-empty">로그인 후 등록한 확장팩이 여기에 표시됩니다.</p>';
+      return;
+    }
+
+    const items = getMyExtensions();
+    if (!items.length) {
+      container.innerHTML = '<p class="dev-ext-empty">아직 등록한 확장팩이 없습니다. 왼쪽 폼에서 업로드해 보세요.</p>';
+      return;
+    }
+
+    const sorted = [...items].sort((a, b) => {
+      const ta = a.createdAt?.seconds ?? a.createdAt ?? 0;
+      const tb = b.createdAt?.seconds ?? b.createdAt ?? 0;
+      return tb - ta;
+    });
+
+    container.innerHTML = sorted.map((ext) => {
+      const approved = ext.approved === true;
+      const statusClass = approved ? 'dev-ext-status--approved' : 'dev-ext-status--pending';
+      const statusLabel = approved ? '승인 완료' : '승인 대기';
+      const cat = DEV_CATEGORY_LABELS[ext.category] || ext.category || '-';
+      const price = Number(ext.price) || 0;
+      const dateStr = ext.createdAt ? toDisplayDate(ext.createdAt) : '';
+      return `
+        <article class="dev-ext-item">
+          <div class="dev-ext-item-head">
+            <strong class="dev-ext-item-name">${escapeHtml(ext.name || '이름 없음')}</strong>
+            <span class="dev-ext-status ${statusClass}">${statusLabel}</span>
+          </div>
+          <p class="dev-ext-item-desc">${escapeHtml(ext.desc || '')}</p>
+          <div class="dev-ext-item-meta">
+            <span>${escapeHtml(cat)}</span>
+            <span>${price.toLocaleString()} DP</span>
+            ${dateStr ? `<span>${escapeHtml(dateStr)}</span>` : ''}
+          </div>
+        </article>
+      `;
+    }).join('');
+  }
+
   function bindDeveloperCenter() {
     const fileInput = $('#dev-item-file');
     const dropZone = $('#dev-file-drop');
@@ -2040,12 +2360,15 @@
 
     $('#dev-submit-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (devUploading) return;
+
       if (!currentUser) {
         showToast('로그인 후 확장팩 업로드가 가능합니다.');
         openAuthModal('login');
         return;
       }
 
+      const form = e.currentTarget;
       const name = $('#dev-item-name')?.value?.trim();
       const category = $('#dev-item-category')?.value;
       const desc = $('#dev-item-desc')?.value?.trim();
@@ -2069,12 +2392,8 @@
         return;
       }
 
-      const submitBtn = $('#dev-submit-btn');
-      const prevLabel = submitBtn?.textContent;
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = '업로드 중...';
-      }
+      devUploading = true;
+      setDevSubmitLoading(true);
 
       try {
         const author = userProfile?.nickname
@@ -2095,45 +2414,45 @@
           uid: currentUser.uid,
         });
 
-        showToast('관리자 검수 후 마켓에 등록됩니다.');
-        e.target.reset();
-        if (fileNameEl) {
-          fileNameEl.textContent = '';
-          fileNameEl.classList.add('hidden');
-        }
-        dropZone?.classList.remove('has-file');
+        showToast('확장팩이 성공적으로 등록되었습니다!');
+        form.reset();
+        resetDevFileInput();
+        updateDeveloperDashboard();
       } catch (err) {
         console.error('[ToyTools] 확장팩 업로드 실패:', err);
         showToast(err.message || '업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.');
       } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = prevLabel || '확장팩 업로드';
-        }
+        devUploading = false;
+        setDevSubmitLoading(false);
       }
     });
 
-    $$('.doc-link').forEach((link) => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        showToast('API 문서는 docs.toy-tools.com 오픈 시 제공됩니다.');
-      });
-    });
+    $('#dev-sample-download')?.addEventListener('click', downloadSampleExtension);
     updateDeveloperDashboard();
     lucide.createIcons();
   }
 
   function updateDeveloperDashboard() {
-    const loggedIn = !!currentUser;
-    const month = loggedIn ? '₩124,500' : '₩0';
-    const total = loggedIn ? '₩892,000' : '₩0';
-    const count = loggedIn ? '3' : '0';
-    const m = $('#dev-revenue-month');
-    const t = $('#dev-revenue-total');
-    const c = $('#dev-creations-count');
-    if (m) m.textContent = month;
-    if (t) t.textContent = total;
-    if (c) c.textContent = count;
+    const totalEl = $('#dev-ext-total');
+    const pendingEl = $('#dev-ext-pending');
+    const approvedEl = $('#dev-ext-approved');
+
+    if (!currentUser) {
+      if (totalEl) totalEl.textContent = '0';
+      if (pendingEl) pendingEl.textContent = '0';
+      if (approvedEl) approvedEl.textContent = '0';
+      renderMyExtensionsList();
+      return;
+    }
+
+    const mine = getMyExtensions();
+    const pending = mine.filter((ext) => ext.approved !== true).length;
+    const approved = mine.filter((ext) => ext.approved === true).length;
+
+    if (totalEl) totalEl.textContent = String(mine.length);
+    if (pendingEl) pendingEl.textContent = String(pending);
+    if (approvedEl) approvedEl.textContent = String(approved);
+    renderMyExtensionsList();
   }
 
   function bindDownloadBtn() {
@@ -2195,6 +2514,15 @@
     }
     html += escapeHtml(body.slice(last)).replace(/\n/g, '<br>');
     return html;
+  }
+
+  function toDisplayDate(val) {
+    if (!val) return '';
+    const dt = val.toDate
+      ? val.toDate()
+      : (val.seconds ? new Date(val.seconds * 1000) : new Date(val));
+    if (Number.isNaN(dt.getTime())) return '';
+    return formatDate(dt);
   }
 
   function formatDate(d) {

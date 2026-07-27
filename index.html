@@ -36,9 +36,9 @@
     };
   </script>
 
-  <link rel="stylesheet" href="./style.css?v=202607271721" />
+  <link rel="stylesheet" href="./style.css?v=202607272000" />
 </head>
-<body class="font-sans bg-studio-base text-gray-100 overflow-x-hidden" data-build="20260727-nav-fix-v5">
+<body class="font-sans bg-studio-base text-gray-100 overflow-x-hidden" data-build="20260727-landing-cms-v9">
 
   <div class="scanlines" aria-hidden="true"></div>
 
@@ -59,8 +59,7 @@
 
         <!-- Desktop GNB -->
         <nav id="desktop-main-nav" class="desktop-main-nav" aria-label="메인 메뉴">
-          <a href="#toys" class="nav-link nav-pill" data-section="toys">장난감 소개</a>
-          <a href="#devlog" class="nav-link nav-pill" data-section="devlog">개발일지</a>
+          <a href="#about" class="nav-link nav-pill" data-section="about">ToyTools 소개</a>
           <a href="#board" class="nav-link nav-pill" data-section="board">자유게시판</a>
           <a href="#toymarket" class="nav-link nav-pill" data-section="toymarket">토이마켓</a>
           <a href="#developer" class="nav-link nav-pill" data-section="developer">개발자센터</a>
@@ -86,8 +85,7 @@
     </div>
 
     <nav id="mobile-nav" class="mobile-nav-panel hidden xl:hidden px-4 py-3 space-y-1">
-      <a href="#toys" class="nav-link mobile-nav-item" data-section="toys">장난감 소개</a>
-      <a href="#devlog" class="nav-link mobile-nav-item" data-section="devlog">개발일지</a>
+      <a href="#about" class="nav-link mobile-nav-item" data-section="about">ToyTools 소개</a>
       <a href="#board" class="nav-link mobile-nav-item" data-section="board">자유게시판</a>
       <a href="#toymarket" class="nav-link mobile-nav-item" data-section="toymarket">토이마켓</a>
       <a href="#developer" class="nav-link mobile-nav-item" data-section="developer">개발자센터</a>
@@ -118,14 +116,14 @@
           <div class="text-center lg:text-left space-y-6 animate-fade-up">
             <div class="hero-badge">
               <span class="hero-badge-dot"></span>
-              v1.0 정식 출시 예정
+              <span id="hero-badge-text">v1.0 정식 출시 예정</span>
             </div>
             <h1 class="hero-title text-3xl sm:text-4xl lg:text-5xl xl:text-[3.25rem]">
-              AI가 판치는 세상,<br />
-              <span class="hero-title-accent">가장 가볍고 강력한</span><br />
-              개발자·업무용 유틸리티 공장
+              <span id="hero-title-line1">AI가 판치는 세상,</span><br />
+              <span class="hero-title-accent" id="hero-title-accent">가장 가볍고 강력한</span><br />
+              <span id="hero-title-line2">개발자·업무용 유틸리티 공장</span>
             </h1>
-            <p class="hero-desc text-base sm:text-lg max-w-xl mx-auto lg:mx-0">
+            <p class="hero-desc text-base sm:text-lg max-w-xl mx-auto lg:mx-0" id="hero-desc">
               복잡한 오픈소스 설정, 무거운 IDE, 끝없는 CLI.<br class="hidden sm:block" />
               ToyTools는 <strong class="text-white font-semibold">클릭 한 번</strong>으로 끝나는 프로급 생산성 스택입니다.
             </p>
@@ -133,19 +131,19 @@
             <div class="space-y-3 pt-2">
               <a href="#" id="download-btn" class="toy-btn-3d">
                 <i data-lucide="download" class="w-5 h-5"></i>
-                ToyTools v1.0 무료 다운로드
+                <span id="hero-cta-label">ToyTools v1.0 무료 다운로드</span>
               </a>
-              <p class="text-sm text-studio-muted flex items-center justify-center lg:justify-start gap-2 text-gray-500">
+              <p class="text-sm text-studio-muted flex items-center justify-center lg:justify-start gap-2 text-gray-500" id="hero-platform-note">
                 <i data-lucide="monitor" class="w-4 h-4"></i>
                 Windows 10/11 &nbsp;•&nbsp; 포터블 .exe &nbsp;•&nbsp; 무설치
               </p>
             </div>
           </div>
 
-          <!-- App Mockup -->
-          <div class="hero-mockup-wrap relative flex justify-center lg:justify-end">
+          <!-- App Mockup / Custom Visual -->
+          <div class="hero-mockup-wrap relative flex justify-center lg:justify-end" id="hero-visual-wrap">
             <div class="hero-mockup-glow absolute inset-0"></div>
-            <div class="hero-mockup w-full max-w-lg">
+            <div id="hero-visual-mockup" class="hero-mockup w-full max-w-lg">
               <div class="mockup-titlebar">
                 <span class="mockup-dot mockup-dot-red"></span>
                 <span class="mockup-dot mockup-dot-yellow"></span>
@@ -175,47 +173,102 @@
                 <span>TypeScript · UTF-8 · ToyTools</span>
               </div>
             </div>
+            <div id="hero-visual-custom" class="hero-visual-custom hidden w-full max-w-lg"></div>
           </div>
         </div>
 
-        <div class="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div class="stat-card"><span class="stat-num">4+</span><span class="stat-label">내장 유틸리티</span></div>
-          <div class="stat-card"><span class="stat-num">3</span><span class="stat-label">프로 테마</span></div>
-          <div class="stat-card"><span class="stat-num">∞</span><span class="stat-label">워크플로우</span></div>
-          <div class="stat-card"><span class="stat-num">0₩</span><span class="stat-label">기본 무료</span></div>
+        <div class="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4" id="hero-stats">
+          <div class="stat-card" data-hero-stat="0"><span class="stat-num">4+</span><span class="stat-label">내장 유틸리티</span></div>
+          <div class="stat-card" data-hero-stat="1"><span class="stat-num">3</span><span class="stat-label">프로 테마</span></div>
+          <div class="stat-card" data-hero-stat="2"><span class="stat-num">∞</span><span class="stat-label">워크플로우</span></div>
+          <div class="stat-card" data-hero-stat="3"><span class="stat-num">0₩</span><span class="stat-label">기본 무료</span></div>
         </div>
       </div>
     </section>
 
-    <!-- ═══════════════════ TOYS SHOWCASE ═══════════════════ -->
-    <section id="toys" class="section section-surface">
+    <!-- ═══════════════════ ABOUT (ToyTools 소개) ═══════════════════ -->
+    <section id="about" class="section section-surface">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <div class="section-header">
-          <span class="section-badge">Products</span>
-          <h2 class="section-title">장난감 소개</h2>
-          <p class="section-desc">설정 없이 바로 실행되는 Windows 네이티브 유틸리티 모음</p>
+          <span class="section-badge">About</span>
+          <h2 class="section-title">ToyTools 소개</h2>
+          <p class="section-desc">비전, 개발 스토리, 팀 안내를 한곳에서 확인하세요</p>
         </div>
 
-        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10" id="toy-cards">
-          <!-- Rendered by JS -->
-        </div>
-      </div>
-    </section>
+        <nav class="sub-tab-nav mt-8" id="about-tabs" aria-label="ToyTools 소개 서브 메뉴">
+          <button type="button" class="sub-tab active" data-about-tab="vision">비전 (Vision)</button>
+          <button type="button" class="sub-tab" data-about-tab="devlog">개발일지 (Dev Log)</button>
+          <button type="button" class="sub-tab" data-about-tab="info">오시는 길 / 안내</button>
+        </nav>
 
-    <!-- ═══════════════════ DEV LOG ═══════════════════ -->
-    <section id="devlog" class="section section-surface">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <div class="section-header">
-          <span class="section-badge">Dev Log</span>
-          <h2 class="section-title">빌드 노트 &amp; 릴리즈</h2>
-          <p class="section-desc">개발 비하인드, 로드맵 업데이트, 엔지니어링 인사이트</p>
+        <div id="about-panel-vision" class="about-panel mt-10">
+          <div class="about-vision-grid">
+            <article class="about-vision-card about-vision-hero">
+              <span class="about-vision-kicker">AI Utility Factory</span>
+              <h3 class="about-vision-title">가장 가볍고 강력한<br />디지털 장난감 공장</h3>
+              <p class="about-vision-text">ToyTools는 복잡한 설정과 무거운 IDE 없이, 클릭 한 번으로 실행되는 프로급 생산성 유틸리티를 제공합니다. AI 시대에 필요한 자동화·미디어·데이터 도구를 누구나 쉽게 꺼내 쓸 수 있는 플랫폼을 지향합니다.</p>
+            </article>
+            <article class="about-vision-card">
+              <i data-lucide="sparkles" class="about-vision-icon"></i>
+              <h4>서비스 방향성</h4>
+              <p>Windows 네이티브 포터블 앱, 웹 커뮤니티, 토이마켓을 하나의 생태계로 연결합니다.</p>
+            </article>
+            <article class="about-vision-card">
+              <i data-lucide="cpu" class="about-vision-icon"></i>
+              <h4>AI 유틸리티 공장</h4>
+              <p>영상·데이터·자동화 워크플로우를 모듈형 장난감처럼 조립하고 확장할 수 있습니다.</p>
+            </article>
+            <article class="about-vision-card">
+              <i data-lucide="users" class="about-vision-icon"></i>
+              <h4>크리에이터 친화</h4>
+              <p>개발자센터에서 확장팩을 등록하고, 토이마켓에서 수익화할 수 있는 오픈 구조를 제공합니다.</p>
+            </article>
+          </div>
+
+          <div id="toys" class="about-toys-section mt-12">
+            <div class="section-header section-header-compact">
+              <h3 class="text-lg font-semibold text-white">장난감 라인업</h3>
+              <p class="section-desc">슈퍼관리자 대시보드에서 관리하는 장난감 카드가 실시간 반영됩니다.</p>
+            </div>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6" id="toy-cards"></div>
+          </div>
         </div>
 
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10" id="devlog-list">
-          <!-- Rendered by JS -->
+        <div id="devlogs" class="about-panel hidden mt-10">
+          <div class="section-header section-header-compact">
+            <h3 class="text-lg font-semibold text-white">개발 비하인드 &amp; 릴리즈 노트</h3>
+            <p class="section-desc">슈퍼관리자 대시보드에서 작성한 글이 실시간으로 반영됩니다.</p>
+          </div>
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6" id="devlog-list"></div>
         </div>
 
-        <!-- Dev log detail modal -->
+        <div id="about-panel-info" class="about-panel hidden mt-10">
+          <div class="about-info-grid">
+            <article class="about-info-card">
+              <i data-lucide="building-2" class="about-info-icon"></i>
+              <h3>팀 정보</h3>
+              <p class="about-info-text">ToyTools Team<br />개발자·직장인을 위한 생산성 툴킷 스튜디오</p>
+              <p class="about-info-meta">toy-tools.com · Windows 10/11</p>
+            </article>
+            <article class="about-info-card">
+              <i data-lucide="mail" class="about-info-icon"></i>
+              <h3>문의처</h3>
+              <p class="about-info-text">서비스·제휴·버그 제보</p>
+              <a href="mailto:support@toy-tools.com" class="about-info-link">support@toy-tools.com</a>
+              <button type="button" class="link-subtle text-sm mt-3" id="about-contact-btn">1:1 문의 폼 열기</button>
+            </article>
+            <article class="about-info-card about-info-map">
+              <div class="about-map-graphic" aria-hidden="true">
+                <span class="about-map-pin">📍</span>
+                <span class="about-map-grid"></span>
+              </div>
+              <h3>오시는 길 / 안내</h3>
+              <p class="about-info-text">온라인 서비스 중심 운영<br />커뮤니티·자료실에서 공지 및 가이드를 확인하세요.</p>
+              <p class="about-info-meta">대한민국 · Remote First</p>
+            </article>
+          </div>
+        </div>
+
         <div id="devlog-modal" class="modal hidden" role="dialog" aria-modal="true">
           <div class="modal-backdrop"></div>
           <div class="modal-content max-w-2xl">
@@ -324,16 +377,16 @@
 
         <div class="grid lg:grid-cols-3 gap-4 mt-10" id="dev-stats-cards">
           <div class="dash-card">
-            <span class="dash-card-label">이번 달 수익</span>
-            <span class="dash-card-value" id="dev-revenue-month">₩0</span>
+            <span class="dash-card-label">등록 확장팩</span>
+            <span class="dash-card-value" id="dev-ext-total">0</span>
           </div>
           <div class="dash-card">
-            <span class="dash-card-label">누적 정산</span>
-            <span class="dash-card-value" id="dev-revenue-total">₩0</span>
+            <span class="dash-card-label">승인 대기</span>
+            <span class="dash-card-value" id="dev-ext-pending">0</span>
           </div>
           <div class="dash-card">
-            <span class="dash-card-label">등록 창작물</span>
-            <span class="dash-card-value" id="dev-creations-count">0</span>
+            <span class="dash-card-label">승인 완료</span>
+            <span class="dash-card-value" id="dev-ext-approved">0</span>
           </div>
         </div>
 
@@ -375,31 +428,34 @@
                   </div>
                 </div>
               </div>
-              <button type="submit" id="dev-submit-btn" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">확장팩 업로드</button>
+              <button type="submit" id="dev-submit-btn" class="toy-btn-3d toy-btn-3d-sm w-full justify-center" data-default-label="확장팩 업로드">
+                <span id="dev-submit-btn-label">확장팩 업로드</span>
+              </button>
             </form>
           </div>
 
-          <div class="glass-panel">
-            <h3 class="panel-title"><i data-lucide="book-open" class="w-4 h-4"></i> 연동 가이드 &amp; API Docs</h3>
-            <div class="doc-links mt-4 space-y-2">
-              <a href="#" class="doc-link" data-doc="quickstart">
-                <i data-lucide="rocket" class="w-4 h-4"></i>
-                <span><strong>Quick Start</strong> — 5분 만에 확장팩 만들기</span>
-              </a>
-              <a href="#" class="doc-link" data-doc="api">
-                <i data-lucide="code-2" class="w-4 h-4"></i>
-                <span><strong>REST API Reference</strong> — 인증, 마켓, 정산</span>
-              </a>
-              <a href="#" class="doc-link" data-doc="sdk">
-                <i data-lucide="boxes" class="w-4 h-4"></i>
-                <span><strong>@toytools/sdk</strong> — TypeScript SDK 가이드</span>
-              </a>
-              <a href="#" class="doc-link" data-doc="publish">
-                <i data-lucide="upload" class="w-4 h-4"></i>
-                <span><strong>Publish Pipeline</strong> — 심사 및 배포 프로세스</span>
-              </a>
+          <div class="space-y-6">
+            <div class="glass-panel">
+              <h3 class="panel-title"><i data-lucide="book-open" class="w-4 h-4"></i> 확장팩 개발 가이드 &amp; 샘플 파일 다운로드</h3>
+              <ul class="dev-guide-list mt-4">
+                <li><strong>1.</strong> 샘플 <code>.py</code> 파일을 다운로드해 구조를 확인하세요.</li>
+                <li><strong>2.</strong> <code>run(context)</code> 함수에 확장팩 로직을 구현합니다.</li>
+                <li><strong>3.</strong> 왼쪽 폼에서 이름·카테고리·가격을 입력하고 스크립트를 업로드하세요.</li>
+                <li><strong>4.</strong> 관리자 검수 후 토이마켓 확장팩 탭에 노출됩니다.</li>
+              </ul>
+              <p class="dev-guide-note">파일 형식: <code>.py</code>만 허용 · 최대 5MB</p>
+              <button type="button" id="dev-sample-download" class="toy-btn-3d toy-btn-3d-sm mt-4 w-full justify-center">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                샘플 확장팩 (.py) 다운로드
+              </button>
             </div>
-            <p class="text-xs text-gray-500 mt-4">문서는 개발자센터 정식 오픈 시 docs.toy-tools.com에서 제공됩니다.</p>
+
+            <div class="glass-panel">
+              <h3 class="panel-title"><i data-lucide="list" class="w-4 h-4"></i> 내가 등록한 확장팩 목록</h3>
+              <div id="dev-my-extensions-list" class="dev-my-extensions-list mt-4">
+                <p class="dev-ext-empty">로그인 후 등록한 확장팩이 여기에 표시됩니다.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -486,8 +542,17 @@
             <p class="sadmin-subtitle">서비스 전체 통제 센터</p>
           </div>
           <nav class="sadmin-nav" id="sadmin-nav" aria-label="관리자 메뉴">
-            <button type="button" class="sadmin-nav-item active" data-sadmin-tab="overview">
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="overview">
               <i data-lucide="layout-dashboard" class="w-4 h-4"></i> 개요 / 통계
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="landing">
+              <i data-lucide="layout-template" class="w-4 h-4"></i> 랜딩 설정
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="toys">
+              <i data-lucide="blocks" class="w-4 h-4"></i> 장난감 관리
+            </button>
+            <button type="button" class="sadmin-nav-item" data-sadmin-tab="devlogs">
+              <i data-lucide="book-open" class="w-4 h-4"></i> 개발일지 관리
             </button>
             <button type="button" class="sadmin-nav-item" data-sadmin-tab="marketplace">
               <i data-lucide="store" class="w-4 h-4"></i> 토이마켓 관리
@@ -539,7 +604,7 @@
 
         <div class="footer-col">
           <h4 class="footer-col-title">서비스</h4>
-          <button type="button" class="footer-text-link block" data-footer-nav="toys">장난감 소개</button>
+          <button type="button" class="footer-text-link block" data-footer-nav="about">ToyTools 소개</button>
           <button type="button" class="footer-text-link block" data-footer-nav="toymarket">토이마켓</button>
           <button type="button" class="footer-text-link block" data-footer-nav="board">자유게시판</button>
         </div>
@@ -853,6 +918,26 @@
     </div>
   </div>
 
+  <!-- Super Admin Home Toy Modal -->
+  <div id="modal-sadmin-toy" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-sadmin-toy-close></div>
+    <div class="modal-content max-w-lg">
+      <button type="button" class="modal-close" data-sadmin-toy-close aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="text-lg font-semibold text-white mb-4">장난감 등록 / 수정</h2>
+      <form id="sadmin-toy-form" class="space-y-3"></form>
+    </div>
+  </div>
+
+  <!-- Super Admin Devlog Modal -->
+  <div id="modal-sadmin-devlog" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-sadmin-devlog-close></div>
+    <div class="modal-content max-w-2xl">
+      <button type="button" class="modal-close" data-sadmin-devlog-close aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <h2 class="text-lg font-semibold text-white mb-4">개발일지 작성 / 수정</h2>
+      <form id="sadmin-devlog-form" class="space-y-3"></form>
+    </div>
+  </div>
+
   <!-- Firebase SDK (Compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -865,8 +950,8 @@
 
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="./firebase-store.js?v=202607271716"></script>
-  <script src="./app.js?v=202607271716"></script>
-  <script src="./admin-dashboard.js?v=202607271716"></script>
+  <script src="./firebase-store.js?v=202607272000"></script>
+  <script src="./app.js?v=202607272000"></script>
+  <script src="./admin-dashboard.js?v=202607272000"></script>
 </body>
 </html>

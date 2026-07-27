@@ -16,6 +16,9 @@
     download: 'toytools_sadmin_download',
     downloadsToday: 'toytools_downloads_today',
     devSubmissions: 'toytools_dev_submissions',
+    toysHome: 'toytools_home_toys',
+    devlogs: 'toytools_devlogs',
+    landing: 'toytools_landing',
   };
 
   let B = null;
@@ -63,6 +66,64 @@
     document.querySelectorAll('[data-sadmin-item-close]').forEach((el) => {
       el.addEventListener('click', () => B.closeModal('modal-sadmin-item'));
     });
+    document.querySelectorAll('[data-sadmin-toy-close]').forEach((el) => {
+      el.addEventListener('click', () => B.closeModal('modal-sadmin-toy'));
+    });
+    document.querySelectorAll('[data-sadmin-devlog-close]').forEach((el) => {
+      el.addEventListener('click', () => B.closeModal('modal-sadmin-devlog'));
+    });
+  }
+
+  function requireAdmin() {
+    if (!B?.isAdmin?.()) {
+      B.showToast('슈퍼관리자 권한이 필요합니다.');
+      return false;
+    }
+    return true;
+  }
+
+  function getHomeToys() {
+    if (FS()) return FS().getHomeToys();
+    return load(KEYS.toysHome, B.getToysDefault?.().map((t, i) => ({
+      id: `local_toy_${i}`,
+      icon: t.icon,
+      title: t.title,
+      desc: t.desc,
+      tag: t.tag,
+      accent: t.accent,
+      downloadUrl: '',
+      downloadStatus: 'available',
+      order: i,
+      active: true,
+    })) || []);
+  }
+
+  function getDevlogs() {
+    if (FS()) return FS().getDevlogs();
+    return load(KEYS.devlogs, B.getDevlogsDefault?.().map((d) => ({
+      id: String(d.id),
+      emoji: d.emoji,
+      title: d.title,
+      author: 'ToyTools',
+      category: '개발 비하인드',
+      body: d.body,
+      date: d.date,
+      views: d.views || 0,
+      comments: d.comments || 0,
+      from: d.from,
+      to: d.to,
+      published: true,
+    })) || []);
+  }
+
+  async function saveHomeToysLocal(items) {
+    save(KEYS.toysHome, items);
+    B.renderToyCards?.();
+  }
+
+  async function saveDevlogsLocal(items) {
+    save(KEYS.devlogs, items);
+    B.renderDevLogs?.();
   }
 
   function setTab(tab, updateHash = true) {
@@ -82,6 +143,9 @@
     el.innerHTML = '<p class="sadmin-empty">데이터 동기화 중…</p>';
     const renderers = {
       overview: renderOverview,
+      landing: renderLandingSettings,
+      toys: renderToysManagement,
+      devlogs: renderDevlogsManagement,
       marketplace: renderMarketplace,
       community: renderCommunity,
       downloads: renderDownloads,
@@ -484,6 +548,276 @@
       renderPanel();
     };
     B.openModal('modal-sadmin-item');
+  }
+
+  // ── Home Toys (장난감 소개) ──
+  function renderToysManagement(el) {
+    if (!requireAdmin()) {
+      el.innerHTML = '<p class="sadmin-empty">슈퍼관리자 권한이 필요합니다.</p>';
+      return;
+    }
+    const toys = getHomeToys();
+
+    el.innerHTML = `
+      <div class="sadmin-page-head sadmin-page-head-row">
+        <div>
+          <h1 class="sadmin-page-title">장난감 관리</h1>
+          <p class="sadmin-page-desc">ToyTools 소개 → 장난감 카드 CRUD (Firestore: toys) — #toys 섹션 실시간 반영</p>
+        </div>
+        <button type="button" class="sadmin-btn sadmin-btn-primary" id="sadmin-toy-add">+ 장난감 등록</button>
+      </div>
+      <div class="sadmin-card">
+        <div class="sadmin-table-wrap">
+          <table class="sadmin-table">
+            <thead>
+              <tr><th>아이콘</th><th>제목</th><th>태그</th><th>설명</th><th>다운로드</th><th>관리</th></tr>
+            </thead>
+            <tbody>
+              ${toys.length ? toys.map((t) => `
+                <tr>
+                  <td class="text-2xl">${t.icon || '🧩'}</td>
+                  <td><strong>${B.escapeHtml(t.title)}</strong></td>
+                  <td><span class="sadmin-tag">${B.escapeHtml(t.tag || '-')}</span></td>
+                  <td class="text-sm text-gray-400 max-w-[220px] truncate">${B.escapeHtml(t.desc || '')}</td>
+                  <td><span class="sadmin-status sadmin-status-${t.downloadStatus === 'available' ? 'approved' : 'pending'}">${B.escapeHtml(t.downloadStatus || 'available')}</span></td>
+                  <td>
+                    <div class="sadmin-actions">
+                      <button type="button" class="sadmin-btn" data-edit-toy="${B.escapeHtml(t.id)}">수정</button>
+                      <button type="button" class="sadmin-btn sadmin-btn-danger" data-del-toy="${B.escapeHtml(t.id)}">삭제</button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('') : '<tr><td colspan="6" class="sadmin-empty">등록된 장난감이 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `
+    document.getElementById('sadmin-toy-add')?.addEventListener('click', () => openToyEdit(null));
+    el.querySelectorAll('[data-edit-toy]').forEach((btn) => {
+      btn.addEventListener('click', () => openToyEdit(btn.dataset.editToy));
+    });
+    el.querySelectorAll('[data-del-toy]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.delToy;
+        confirmAction({
+          title: '장난감 삭제',
+          message: '이 장난감 카드를 삭제합니다. 메인 페이지에서도 즉시 제거됩니다.',
+          danger: true,
+          onConfirm: async () => {
+            try {
+              if (FS()) await FS().deleteHomeToy(id);
+              else {
+                await saveHomeToysLocal(getHomeToys().filter((t) => t.id !== id));
+              }
+              B.showToast('장난감이 삭제되었습니다.');
+              renderPanel();
+            } catch (err) {
+              B.showToast(err.message || '삭제에 실패했습니다.');
+            }
+          },
+        });
+      });
+    });
+  }
+
+  function openToyEdit(id) {
+    if (!requireAdmin()) return;
+    const item = id ? getHomeToys().find((t) => t.id === id) : null;
+    const form = document.getElementById('sadmin-toy-form');
+    if (!form) return;
+    form.innerHTML = `
+      <div><label class="form-label">장난감 이름</label><input type="text" id="sadmin-toy-title" class="form-input" value="${B.escapeHtml(item?.title || '')}" required /></div>
+      <div><label class="form-label">설명</label><textarea id="sadmin-toy-desc" class="form-input min-h-[80px]" required>${B.escapeHtml(item?.desc || '')}</textarea></div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="form-label">태그</label><input type="text" id="sadmin-toy-tag" class="form-input" value="${B.escapeHtml(item?.tag || '')}" placeholder="영상, 데이터, 유틸…" /></div>
+        <div><label class="form-label">대표 아이콘 (Emoji)</label><input type="text" id="sadmin-toy-icon" class="form-input" value="${B.escapeHtml(item?.icon || '🧩')}" maxlength="4" /></div>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="form-label">액센트 색상</label><input type="text" id="sadmin-toy-accent" class="form-input" value="${B.escapeHtml(item?.accent || '#6366F1')}" placeholder="#6366F1" /></div>
+        <div><label class="form-label">표시 순서</label><input type="number" id="sadmin-toy-order" class="form-input" value="${item?.order ?? getHomeToys().length}" min="0" /></div>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="form-label">다운로드 링크</label><input type="url" id="sadmin-toy-download" class="form-input" value="${B.escapeHtml(item?.downloadUrl || '')}" placeholder="https://..." /></div>
+        <div><label class="form-label">다운로드 상태</label>
+          <select id="sadmin-toy-status" class="form-input">
+            <option value="available"${(item?.downloadStatus || 'available') === 'available' ? ' selected' : ''}>available</option>
+            <option value="beta"${item?.downloadStatus === 'beta' ? ' selected' : ''}>beta</option>
+            <option value="coming_soon"${item?.downloadStatus === 'coming_soon' ? ' selected' : ''}>coming_soon</option>
+          </select>
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sadmin-toy-active" ${item?.active !== false ? 'checked' : ''} /> 메인 페이지에 노출</label>
+      <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mt-2">${item ? '수정 저장' : '등록'}</button>
+    `;
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      if (!requireAdmin()) return;
+      const payload = {
+        id: item?.id,
+        title: document.getElementById('sadmin-toy-title').value.trim(),
+        desc: document.getElementById('sadmin-toy-desc').value.trim(),
+        tag: document.getElementById('sadmin-toy-tag').value.trim(),
+        icon: document.getElementById('sadmin-toy-icon').value.trim() || '🧩',
+        accent: document.getElementById('sadmin-toy-accent').value.trim() || '#6366F1',
+        order: Number(document.getElementById('sadmin-toy-order').value) || 0,
+        downloadUrl: document.getElementById('sadmin-toy-download').value.trim(),
+        downloadStatus: document.getElementById('sadmin-toy-status').value,
+        active: document.getElementById('sadmin-toy-active').checked,
+      };
+      try {
+        if (FS()) await FS().upsertHomeToy(payload);
+        else {
+          const list = [...getHomeToys()];
+          const newId = payload.id || `local_toy_${Date.now()}`;
+          const mapped = { ...payload, id: newId };
+          const idx = list.findIndex((t) => t.id === newId);
+          if (idx >= 0) list[idx] = mapped;
+          else list.push(mapped);
+          await saveHomeToysLocal(list);
+        }
+        B.closeModal('modal-sadmin-toy');
+        B.showToast(item ? '장난감이 수정되었습니다.' : '장난감이 등록되었습니다.');
+        renderPanel();
+      } catch (err) {
+        B.showToast(err.message || '저장에 실패했습니다.');
+      }
+    };
+    B.openModal('modal-sadmin-toy');
+  }
+
+  // ── Devlogs (개발일지) ──
+  function renderDevlogsManagement(el) {
+    if (!requireAdmin()) {
+      el.innerHTML = '<p class="sadmin-empty">슈퍼관리자 권한이 필요합니다.</p>';
+      return;
+    }
+    const logs = getDevlogs();
+
+    el.innerHTML = `
+      <div class="sadmin-page-head sadmin-page-head-row">
+        <div>
+          <h1 class="sadmin-page-title">개발일지 관리</h1>
+          <p class="sadmin-page-desc">ToyTools 소개 → 개발일지 서브탭 CRUD (Firestore: devlogs)</p>
+        </div>
+        <button type="button" class="sadmin-btn sadmin-btn-primary" id="sadmin-devlog-add">+ 개발일지 작성</button>
+      </div>
+      <div class="sadmin-card">
+        <div class="sadmin-table-wrap">
+          <table class="sadmin-table">
+            <thead>
+              <tr><th>작성일</th><th>제목</th><th>카테고리</th><th>작성자</th><th>관리</th></tr>
+            </thead>
+            <tbody>
+              ${logs.length ? logs.map((d) => `
+                <tr>
+                  <td>${B.escapeHtml(d.date || '-')}</td>
+                  <td>${d.emoji || '📝'} ${B.escapeHtml(d.title)}</td>
+                  <td>${B.escapeHtml(d.category || '-')}</td>
+                  <td>${B.escapeHtml(d.author || 'ToyTools')}</td>
+                  <td>
+                    <div class="sadmin-actions">
+                      <button type="button" class="sadmin-btn" data-edit-devlog="${B.escapeHtml(d.id)}">수정</button>
+                      <button type="button" class="sadmin-btn sadmin-btn-danger" data-del-devlog="${B.escapeHtml(d.id)}">삭제</button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('') : '<tr><td colspan="5" class="sadmin-empty">등록된 개발일지가 없습니다.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('sadmin-devlog-add')?.addEventListener('click', () => openDevlogEdit(null));
+    el.querySelectorAll('[data-edit-devlog]').forEach((btn) => {
+      btn.addEventListener('click', () => openDevlogEdit(btn.dataset.editDevlog));
+    });
+    el.querySelectorAll('[data-del-devlog]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.delDevlog;
+        confirmAction({
+          title: '개발일지 삭제',
+          message: '이 개발일지를 삭제합니다. 메인 페이지에서도 즉시 제거됩니다.',
+          danger: true,
+          onConfirm: async () => {
+            try {
+              if (FS()) await FS().deleteDevlog(id);
+              else await saveDevlogsLocal(getDevlogs().filter((d) => d.id !== id));
+              B.showToast('개발일지가 삭제되었습니다.');
+              renderPanel();
+            } catch (err) {
+              B.showToast(err.message || '삭제에 실패했습니다.');
+            }
+          },
+        });
+      });
+    });
+  }
+
+  function openDevlogEdit(id) {
+    if (!requireAdmin()) return;
+    const item = id ? getDevlogs().find((d) => d.id === id) : null;
+    const form = document.getElementById('sadmin-devlog-form');
+    if (!form) return;
+    form.innerHTML = `
+      <div><label class="form-label">일지 제목</label><input type="text" id="sadmin-devlog-title" class="form-input" value="${B.escapeHtml(item?.title || '')}" required /></div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="form-label">작성자</label><input type="text" id="sadmin-devlog-author" class="form-input" value="${B.escapeHtml(item?.author || 'ToyTools')}" /></div>
+        <div><label class="form-label">작성일</label><input type="date" id="sadmin-devlog-date" class="form-input" value="${B.escapeHtml(item?.date || B.formatDate(new Date()))}" /></div>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-3">
+        <div><label class="form-label">카테고리</label><input type="text" id="sadmin-devlog-category" class="form-input" value="${B.escapeHtml(item?.category || '개발 비하인드')}" placeholder="v1.0 업데이트, 개발 비하인드…" /></div>
+        <div><label class="form-label">아이콘 (Emoji)</label><input type="text" id="sadmin-devlog-emoji" class="form-input" value="${B.escapeHtml(item?.emoji || '📝')}" maxlength="4" /></div>
+        <div><label class="form-label">표시 순서</label><input type="number" id="sadmin-devlog-order" class="form-input" value="${item?.order ?? getDevlogs().length}" min="0" /></div>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="form-label">썸네일 From 색</label><input type="text" id="sadmin-devlog-from" class="form-input" value="${B.escapeHtml(item?.from || '#FFE0EC')}" /></div>
+        <div><label class="form-label">썸네일 To 색</label><input type="text" id="sadmin-devlog-to" class="form-input" value="${B.escapeHtml(item?.to || '#E0F7FF')}" /></div>
+      </div>
+      <div><label class="form-label">본문 (텍스트/마크다운)</label><textarea id="sadmin-devlog-body" class="form-input min-h-[160px]" required>${B.escapeHtml(item?.body || '')}</textarea></div>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="sadmin-devlog-published" ${item?.published !== false ? 'checked' : ''} /> 메인 페이지에 게시</label>
+      <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mt-2">${item ? '수정 저장' : '등록'}</button>
+    `;
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      if (!requireAdmin()) return;
+      const payload = {
+        id: item?.id,
+        title: document.getElementById('sadmin-devlog-title').value.trim(),
+        author: document.getElementById('sadmin-devlog-author').value.trim() || 'ToyTools',
+        date: document.getElementById('sadmin-devlog-date').value || B.formatDate(new Date()),
+        category: document.getElementById('sadmin-devlog-category').value.trim() || '기타',
+        emoji: document.getElementById('sadmin-devlog-emoji').value.trim() || '📝',
+        order: Number(document.getElementById('sadmin-devlog-order').value) || 0,
+        from: document.getElementById('sadmin-devlog-from').value.trim() || '#FFE0EC',
+        to: document.getElementById('sadmin-devlog-to').value.trim() || '#E0F7FF',
+        body: document.getElementById('sadmin-devlog-body').value.trim(),
+        views: item?.views || 0,
+        comments: item?.comments || 0,
+        published: document.getElementById('sadmin-devlog-published').checked,
+      };
+      try {
+        if (FS()) await FS().upsertDevlog(payload);
+        else {
+          const list = [...getDevlogs()];
+          const newId = payload.id || `local_devlog_${Date.now()}`;
+          const mapped = { ...payload, id: newId };
+          const idx = list.findIndex((d) => d.id === newId);
+          if (idx >= 0) list[idx] = mapped;
+          else list.push(mapped);
+          await saveDevlogsLocal(list);
+        }
+        B.closeModal('modal-sadmin-devlog');
+        B.showToast(item ? '개발일지가 수정되었습니다.' : '개발일지가 등록되었습니다.');
+        renderPanel();
+      } catch (err) {
+        B.showToast(err.message || '저장에 실패했습니다.');
+      }
+    };
+    B.openModal('modal-sadmin-devlog');
   }
 
   // ── Community ──
@@ -1072,6 +1406,174 @@
     }
     B.showToast(status === 'approved' ? '정산이 승인되었습니다.' : '정산이 거절되었습니다.');
     renderPanel();
+  }
+
+  // ── Landing CMS (메인 히어로) ──
+  function getLandingConfig() {
+    if (FS()) return FS().getLanding();
+    return load(KEYS.landing, FS()?.getDefaultLanding?.() || {
+      badge: 'v1.0 정식 출시 예정',
+      titleLine1: 'AI가 판치는 세상,',
+      titleAccent: '가장 가볍고 강력한',
+      titleLine2: '개발자·업무용 유틸리티 공장',
+      description: '',
+      descriptionHighlight: '클릭 한 번',
+      ctaLabel: 'ToyTools v1.0 무료 다운로드',
+      platformNote: 'Windows 10/11 • 포터블 .exe • 무설치',
+      mediaType: 'mockup',
+      mediaUrl: '',
+      mediaHtml: '',
+      stats: [
+        { value: '4+', label: '내장 유틸리티' },
+        { value: '3', label: '프로 테마' },
+        { value: '∞', label: '워크플로우' },
+        { value: '0₩', label: '기본 무료' },
+      ],
+    });
+  }
+
+  function renderLandingSettings(el) {
+    if (!requireAdmin()) {
+      el.innerHTML = '<p class="sadmin-empty">슈퍼관리자 권한이 필요합니다.</p>';
+      return;
+    }
+    const cfg = getLandingConfig();
+    const stats = cfg.stats || [];
+
+    el.innerHTML = `
+      <div class="sadmin-page-head">
+        <h1 class="sadmin-page-title">랜딩페이지 설정</h1>
+        <p class="sadmin-page-desc">메인 히어로 섹션 CMS — Firestore <code>settings/landing</code> 실시간 반영</p>
+      </div>
+
+      <form id="sadmin-landing-form" class="space-y-6">
+        <div class="sadmin-card">
+          <h3 class="sadmin-card-title"><i data-lucide="type" class="w-4 h-4"></i> 텍스트 콘텐츠</h3>
+          <div class="grid lg:grid-cols-2 gap-4 mt-4">
+            <div><label class="form-label">배지 텍스트</label><input type="text" id="landing-badge" class="form-input" value="${B.escapeHtml(cfg.badge || '')}" /></div>
+            <div><label class="form-label">CTA 버튼 라벨</label><input type="text" id="landing-cta" class="form-input" value="${B.escapeHtml(cfg.ctaLabel || '')}" /></div>
+            <div><label class="form-label">메인 타이틀 1행</label><input type="text" id="landing-title1" class="form-input" value="${B.escapeHtml(cfg.titleLine1 || '')}" /></div>
+            <div><label class="form-label">메인 타이틀 강조</label><input type="text" id="landing-title-accent" class="form-input" value="${B.escapeHtml(cfg.titleAccent || '')}" /></div>
+            <div class="lg:col-span-2"><label class="form-label">메인 타이틀 2행</label><input type="text" id="landing-title2" class="form-input" value="${B.escapeHtml(cfg.titleLine2 || '')}" /></div>
+            <div class="lg:col-span-2"><label class="form-label">서브 설명글</label><textarea id="landing-desc" class="form-input min-h-[100px]">${B.escapeHtml(cfg.description || '')}</textarea></div>
+            <div><label class="form-label">설명 강조 키워드</label><input type="text" id="landing-desc-highlight" class="form-input" value="${B.escapeHtml(cfg.descriptionHighlight || '')}" placeholder="클릭 한 번" /></div>
+            <div><label class="form-label">플랫폼 안내</label><input type="text" id="landing-platform" class="form-input" value="${B.escapeHtml(cfg.platformNote || '')}" /></div>
+          </div>
+        </div>
+
+        <div class="sadmin-card">
+          <h3 class="sadmin-card-title"><i data-lucide="image" class="w-4 h-4"></i> 우측 비주얼 미디어</h3>
+          <div class="grid lg:grid-cols-2 gap-4 mt-4">
+            <div>
+              <label class="form-label">미디어 타입</label>
+              <select id="landing-media-type" class="form-input">
+                <option value="mockup"${cfg.mediaType === 'mockup' ? ' selected' : ''}>기본 IDE 미리보기</option>
+                <option value="image"${cfg.mediaType === 'image' ? ' selected' : ''}>이미지 URL</option>
+                <option value="video"${cfg.mediaType === 'video' ? ' selected' : ''}>비디오 URL</option>
+                <option value="html"${cfg.mediaType === 'html' ? ' selected' : ''}>코드 미리보기 HTML</option>
+              </select>
+            </div>
+            <div id="landing-media-url-wrap">
+              <label class="form-label">미디어 URL</label>
+              <input type="url" id="landing-media-url" class="form-input" value="${B.escapeHtml(cfg.mediaUrl || '')}" placeholder="https://..." />
+            </div>
+            <div id="landing-media-upload-wrap" class="lg:col-span-2">
+              <label class="form-label">파일 업로드 (이미지/비디오)</label>
+              <input type="file" id="landing-media-file" class="form-input" accept="image/*,video/*" />
+              <p class="text-xs text-gray-500 mt-1">업로드 시 URL 필드에 자동 반영됩니다. (Firebase Storage: landing/)</p>
+            </div>
+            <div id="landing-media-html-wrap" class="lg:col-span-2 hidden">
+              <label class="form-label">코드 미리보기 HTML</label>
+              <textarea id="landing-media-html" class="form-input min-h-[160px] font-mono text-xs" placeholder="&lt;motion.div class=&quot;hero-custom-preview&quot;&gt;...&lt;/motion.div&gt;">${B.escapeHtml(cfg.mediaHtml || '')}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="sadmin-card">
+          <h3 class="sadmin-card-title"><i data-lucide="bar-chart-3" class="w-4 h-4"></i> 하단 수치 스탯 카드</h3>
+          <div class="grid sm:grid-cols-2 gap-4 mt-4">
+            ${[0, 1, 2, 3].map((i) => `
+              <div class="sadmin-landing-stat-row">
+                <span class="text-xs text-gray-500 mb-2 block">카드 ${i + 1}</span>
+                <div class="grid grid-cols-2 gap-2">
+                  <input type="text" id="landing-stat-value-${i}" class="form-input" value="${B.escapeHtml(stats[i]?.value || '')}" placeholder="숫자" />
+                  <input type="text" id="landing-stat-label-${i}" class="form-input" value="${B.escapeHtml(stats[i]?.label || '')}" placeholder="라벨" />
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <button type="submit" class="toy-btn-3d toy-btn-3d-sm">랜딩 설정 저장</button>
+      </form>
+    `;
+
+    const mediaTypeEl = document.getElementById('landing-media-type');
+    const urlWrap = document.getElementById('landing-media-url-wrap');
+    const uploadWrap = document.getElementById('landing-media-upload-wrap');
+    const htmlWrap = document.getElementById('landing-media-html-wrap');
+
+    function syncMediaFields() {
+      const type = mediaTypeEl?.value || 'mockup';
+      urlWrap?.classList.toggle('hidden', type === 'mockup' || type === 'html');
+      uploadWrap?.classList.toggle('hidden', type === 'mockup' || type === 'html');
+      htmlWrap?.classList.toggle('hidden', type !== 'html');
+    }
+    mediaTypeEl?.addEventListener('change', syncMediaFields);
+    syncMediaFields();
+
+    document.getElementById('sadmin-landing-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!requireAdmin()) return;
+
+      const submitBtn = e.target.querySelector('[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        let mediaUrl = document.getElementById('landing-media-url')?.value?.trim() || '';
+        const mediaFile = document.getElementById('landing-media-file')?.files?.[0];
+        const mediaType = mediaTypeEl?.value || 'mockup';
+
+        if (mediaFile && (mediaType === 'image' || mediaType === 'video')) {
+          const uid = B.getCurrentUser?.()?.uid || 'admin';
+          if (FS()?.uploadLandingMedia) {
+            mediaUrl = await FS().uploadLandingMedia(mediaFile, uid);
+          } else {
+            throw new Error('Firebase Storage 업로드를 사용할 수 없습니다.');
+          }
+        }
+
+        const payload = {
+          badge: document.getElementById('landing-badge')?.value?.trim(),
+          titleLine1: document.getElementById('landing-title1')?.value?.trim(),
+          titleAccent: document.getElementById('landing-title-accent')?.value?.trim(),
+          titleLine2: document.getElementById('landing-title2')?.value?.trim(),
+          description: document.getElementById('landing-desc')?.value?.trim(),
+          descriptionHighlight: document.getElementById('landing-desc-highlight')?.value?.trim(),
+          ctaLabel: document.getElementById('landing-cta')?.value?.trim(),
+          platformNote: document.getElementById('landing-platform')?.value?.trim(),
+          mediaType,
+          mediaUrl,
+          mediaHtml: document.getElementById('landing-media-html')?.value || '',
+          stats: [0, 1, 2, 3].map((i) => ({
+            value: document.getElementById(`landing-stat-value-${i}`)?.value?.trim() || '',
+            label: document.getElementById(`landing-stat-label-${i}`)?.value?.trim() || '',
+          })),
+        };
+
+        if (FS()) await FS().saveLanding(payload);
+        else {
+          save(KEYS.landing, payload);
+          B.renderHero?.();
+        }
+        B.showToast('랜딩페이지 설정이 저장되었습니다.');
+      } catch (err) {
+        console.error('[SuperAdmin] 랜딩 설정 저장 실패:', err);
+        B.showToast(err.message || '저장에 실패했습니다.');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
   }
 
   // ── Settings ──

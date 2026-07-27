@@ -7,5 +7,10 @@ service firebase.storage {
         && request.resource.size < 5 * 1024 * 1024
         && fileName.matches('.*\\.py$');
     }
+    match /landing/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024;
+    }
   }
 }
