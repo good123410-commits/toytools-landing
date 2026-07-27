@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // users: 본인 문서 읽기/쓰기, 로그인 사용자는 목록 조회 가능 (관리자 대시보드)
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 토이마켓 — Firestore 실데이터 컬렉션
+    match /store_skins/{itemId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /store_toys/{itemId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /boards/{boardId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if isSignedIn();
+    }
+
+    // 레거시 컬렉션 (마이그레이션 전 호환)
+    match /market_items/{itemId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /inquiries/{id} {
+      allow create: if true;
+      allow read, update: if isSignedIn();
+    }
+
+    match /dev_submissions/{id} {
+      allow create: if isSignedIn();
+      allow read, update: if isSignedIn();
+    }
+
+    match /payouts/{id} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}

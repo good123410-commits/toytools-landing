@@ -6,8 +6,8 @@
   'use strict';
 
   // ═══════════════════ FIREBASE CONFIG ═══════════════════
-  // ⚠️ Firebase Console에서 프로젝트 생성 후 아래 값을 교체하세요.
-  const FIREBASE_CONFIG = {
+  // firebase-config.js 에서 window.FIREBASE_CONFIG 로 주입하거나 아래 값을 직접 입력하세요.
+  const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
     apiKey: 'YOUR_API_KEY',
     authDomain: 'YOUR_PROJECT.firebaseapp.com',
     projectId: 'YOUR_PROJECT_ID',
@@ -176,6 +176,7 @@
     isAdmin = sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true';
     updateAdminUI();
 
+    await setupDataStore();
     await loadBoards();
     if (boards.length > 0) {
       selectBoard(boards[0].id);
@@ -194,6 +195,7 @@
       auth = firebase.auth();
       db = firebase.firestore();
       firebaseReady = true;
+      console.info('[ToyTools] Firebase 연결됨 — project:', FIREBASE_CONFIG.projectId);
 
       auth.onAuthStateChanged(async (user) => {
         currentUser = user;
@@ -206,10 +208,84 @@
         renderToyMarket();
         updateDeveloperDashboard();
       });
+
+      if (sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true') {
+        ensureFirestoreAuthForAdmin();
+      }
     } catch (err) {
       console.error('[ToyTools] Firebase 초기화 실패:', err);
       showToast('Firebase 연결에 실패했습니다.');
     }
+  }
+
+  async function ensureFirestoreAuthForAdmin() {
+    if (!firebaseReady || !auth || auth.currentUser) return;
+    try {
+      await auth.signInAnonymously();
+      console.info('[ToyTools] 관리자 Firestore 접근용 익명 인증 완료');
+    } catch (err) {
+      console.warn('[ToyTools] 익명 인증 실패 — users 컬렉션 조회가 제한될 수 있습니다.', err);
+    }
+  }
+
+  function getMarketCatalogItems(type) {
+    const catalogType = type === 'skins' ? 'skin' : type;
+    if (window.SuperAdmin?.getMarketCatalog) {
+      return window.SuperAdmin.getMarketCatalog(catalogType);
+    }
+    const FS = window.FirebaseStore;
+    if (FS?.isReady()) {
+      const list = catalogType === 'skin' ? FS.getSkins() : FS.getToys().filter((i) => i.type === catalogType);
+      return list.filter((i) => i.status === 'approved' && i.active !== false);
+    }
+    if (catalogType === 'skin') return SKINS;
+    if (catalogType === 'game') return MINIGAMES;
+    return EXTENSIONS;
+  }
+
+  function findMarketItem(type, itemId) {
+    const catalogType = type === 'skin' ? 'skin' : type;
+    const FS = window.FirebaseStore;
+    if (FS?.isReady()) {
+      if (catalogType === 'skin') return FS.getSkins().find((i) => i.id === itemId);
+      return FS.getToys().find((i) => i.id === itemId && i.type === catalogType);
+    }
+    const fallback = catalogType === 'skin' ? SKINS : (catalogType === 'game' ? MINIGAMES : EXTENSIONS);
+    return fallback.find((i) => i.id === itemId);
+  }
+
+  async function setupDataStore() {
+    if (typeof window.FirebaseStore === 'undefined') return;
+    await window.FirebaseStore.init(getBridge());
+  }
+
+  function getBridge() {
+    return {
+      $, $$, escapeHtml, showToast, formatDate, formatDateTime,
+      navigateTo,
+      openModal,
+      closeModal,
+      isAdmin: () => isAdmin,
+      isFirebaseReady: () => firebaseReady,
+      getDb: () => db,
+      getFirestore: () => (typeof firebase !== 'undefined' ? firebase.firestore : null),
+      getBoards: () => boards,
+      getChangelogDefault: () => CHANGELOG,
+      getFaqDefault: () => FAQ_ITEMS,
+      SKINS, MINIGAMES, EXTENSIONS,
+      adminPostNotice,
+      adminCreateBoard,
+      adminDeleteBoard,
+      adminDeletePost,
+      adminDeletePostsByNick,
+      renderToyMarket,
+      renderResources,
+      onDataChange: () => {
+        renderToyMarket();
+        renderResources();
+        if (isAdmin) window.SuperAdmin?.renderPanel?.();
+      },
+    };
   }
 
   function initTossPayments() {
@@ -230,6 +306,9 @@
       nickname,
       cash: 0,
       ownedSkins: ['default'],
+      ownedItems: [],
+      status: 'normal',
+      role: 'user',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     });
     return cred.user;
@@ -437,7 +516,7 @@
   // ═══════════════════ SKIN PURCHASE ═══════════════════
   async function buySkin(skinId) {
     if (!currentUser || !userProfile) { showToast('로그인 후 구매할 수 있습니다.'); return; }
-    const skin = SKINS.find((s) => s.id === skinId);
+    const skin = findMarketItem('skin', skinId);
     if (!skin) return;
     if ((userProfile.ownedSkins || []).includes(skinId)) {
       showToast('이미 보유한 스킨입니다.');
@@ -1031,6 +1110,7 @@
         sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
         closeAllModals();
         updateAdminUI();
+        ensureFirestoreAuthForAdmin();
         navigateTo('admin');
         showToast('슈퍼 관리자 모드가 활성화되었습니다.');
         e.target.reset();
@@ -1090,18 +1170,26 @@
     showToast('공지사항이 등록되었습니다.');
   }
 
-  function adminDeletePostsByNick(nick) {
-    const q = nick.trim().toLowerCase();
-    boards.forEach((b) => {
-      try {
-        const raw = localStorage.getItem(`toytools_posts_${b.id}`);
-        if (!raw) return;
-        const list = JSON.parse(raw).filter((p) => (p.nick || '').toLowerCase() !== q);
-        localStorage.setItem(`toytools_posts_${b.id}`, JSON.stringify(list));
-      } catch (_) { /* ignore */ }
-    });
+  async function adminDeletePostsByNick(nick) {
+    const q = nick.trim();
+    if (firebaseReady && db) {
+      const snap = await db.collection('posts').where('nick', '==', q).get();
+      const batch = db.batch();
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    } else {
+      const ql = q.toLowerCase();
+      boards.forEach((b) => {
+        try {
+          const raw = localStorage.getItem(`toytools_posts_${b.id}`);
+          if (!raw) return;
+          const list = JSON.parse(raw).filter((p) => (p.nick || '').toLowerCase() !== ql);
+          localStorage.setItem(`toytools_posts_${b.id}`, JSON.stringify(list));
+        } catch (_) { /* ignore */ }
+      });
+    }
     if (currentBoardId) {
-      posts = posts.filter((p) => (p.nick || '').toLowerCase() !== q);
+      posts = posts.filter((p) => (p.nick || '').toLowerCase() !== q.toLowerCase());
       saveLocalPosts();
       renderBoard();
     }
@@ -1403,13 +1491,13 @@
     let buyType;
     if (toymarketTab === 'games') {
       buyType = 'game';
-      items = window.SuperAdmin?.getMarketCatalog('game') || MINIGAMES;
+      items = getMarketCatalogItems('game');
     } else if (toymarketTab === 'extensions') {
       buyType = 'extension';
-      items = window.SuperAdmin?.getMarketCatalog('extension') || EXTENSIONS;
+      items = getMarketCatalogItems('extension');
     } else {
       buyType = 'skin';
-      items = window.SuperAdmin?.getMarketCatalog('skin') || SKINS;
+      items = getMarketCatalogItems('skin');
     }
 
     const owned = userProfile?.ownedSkins || [];
@@ -1451,8 +1539,7 @@
       showToast('로그인 후 구매할 수 있습니다.');
       return;
     }
-    const catalog = type === 'game' ? MINIGAMES : EXTENSIONS;
-    const item = catalog.find((i) => i.id === itemId);
+    const item = findMarketItem(type, itemId);
     if (!item) return;
     const owned = userProfile.ownedItems || [];
     if (owned.includes(itemId)) {
@@ -1500,6 +1587,8 @@
       const body = $('#contact-body')?.value?.trim();
       if (window.SuperAdmin) {
         window.SuperAdmin.addInquiry({ email, subject, body });
+      } else if (window.FirebaseStore) {
+        window.FirebaseStore.addInquiry({ email, subject, body });
       }
       showToast('문의가 접수되었습니다. 1~2 영업일 내 답변드립니다.');
       e.target.reset();
@@ -1536,7 +1625,7 @@
   function renderChangelog() {
     const container = $('#changelog-list');
     if (!container) return;
-    const data = window.SuperAdmin?.getChangelog() || CHANGELOG;
+    const data = window.FirebaseStore?.getChangelog?.() || CHANGELOG;
     container.innerHTML = data.map((c) => `
       <div class="changelog-item">
         <div><span class="changelog-version">${escapeHtml(c.version)}</span><span class="changelog-date">${c.date}</span></div>
@@ -1548,7 +1637,7 @@
   function renderFAQ() {
     const container = $('#faq-accordion');
     if (!container) return;
-    const data = window.SuperAdmin?.getFaq() || FAQ_ITEMS;
+    const data = window.FirebaseStore?.getFaq?.() || FAQ_ITEMS;
     container.innerHTML = data.map((f, i) => `
       <div class="faq-item" data-faq="${i}">
         <button type="button" class="faq-question">
@@ -1605,6 +1694,16 @@
           nick: userProfile?.nickname || currentUser?.email,
           email: currentUser?.email,
         });
+      } else if (window.FirebaseStore) {
+        window.FirebaseStore.addDevSubmission({
+          itemType,
+          type: itemType,
+          name,
+          desc,
+          url,
+          nick: userProfile?.nickname || currentUser?.email,
+          email: currentUser?.email,
+        });
       }
       showToast('등록 신청이 접수되었습니다. 심사 후 연락드립니다.');
       e.target.reset();
@@ -1634,8 +1733,12 @@
   function bindDownloadBtn() {
     const handleDownload = (e) => {
       e.preventDefault();
-      window.SuperAdmin?.incrementDownloadCount();
-      const info = window.SuperAdmin?.getDownloadInfo?.();
+      if (window.FirebaseStore) {
+        window.FirebaseStore.incrementDownloadCount(formatDate);
+      } else {
+        window.SuperAdmin?.incrementDownloadCount?.();
+      }
+      const info = window.FirebaseStore?.getDownload?.() || window.SuperAdmin?.getDownloadInfo?.();
       if (info?.url && info.url !== '#') {
         window.open(info.url, '_blank');
       }
@@ -1710,24 +1813,7 @@
   }
 
   // ── Bridge for Super Admin Dashboard ──
-  window.ToyToolsBridge = {
-    $, $$, escapeHtml, showToast, formatDate, formatDateTime,
-    navigateTo,
-    openModal,
-    closeModal,
-    isAdmin: () => isAdmin,
-    getBoards: () => boards,
-    getChangelogDefault: () => CHANGELOG,
-    getFaqDefault: () => FAQ_ITEMS,
-    SKINS, MINIGAMES, EXTENSIONS,
-    adminPostNotice,
-    adminCreateBoard,
-    adminDeleteBoard,
-    adminDeletePost,
-    adminDeletePostsByNick,
-    renderToyMarket,
-    renderResources,
-  };
+  window.ToyToolsBridge = getBridge();
 
   // ── Boot ──
   if (document.readyState === 'loading') {

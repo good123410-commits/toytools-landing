@@ -27,10 +27,12 @@
   let userSearch = '';
   let payoutFilter = 'pending';
   let pendingConfirm = null;
+  const FS = () => window.FirebaseStore;
 
-  function init() {
+  async function init() {
     B = window.ToyToolsBridge;
     if (!B) return;
+    if (FS()) await FS().waitReady();
     bindNav();
     bindModals();
     if (B.isAdmin()) renderPanel();
@@ -73,9 +75,11 @@
     lucide.createIcons();
   }
 
-  function renderPanel() {
+  async function renderPanel() {
     const el = document.getElementById('sadmin-content');
     if (!el) return;
+    if (FS()) await FS().waitReady();
+    el.innerHTML = '<p class="sadmin-empty">데이터 동기화 중…</p>';
     const renderers = {
       overview: renderOverview,
       marketplace: renderMarketplace,
@@ -89,7 +93,7 @@
     lucide.createIcons();
   }
 
-  // ── Storage helpers ──
+  // ── Storage helpers (FirebaseStore 우선, localStorage 폴백) ──
   function load(key, fallback) {
     try {
       const raw = localStorage.getItem(key);
@@ -103,23 +107,15 @@
   }
 
   function getMarketItems() {
+    if (FS()) return FS().getMarket();
     let items = load(KEYS.market, null);
     if (!items) {
       items = [];
       const add = (list, type) => list.forEach((i) => {
         items.push({
-          id: i.id,
-          type,
-          name: i.name,
-          desc: i.desc,
-          price: i.price,
-          emoji: i.emoji,
-          bg: i.bg,
-          tag: i.gen || i.tag || '',
-          status: 'approved',
-          active: true,
-          creator: 'ToyTools',
-          submittedAt: Date.now(),
+          id: i.id, type, name: i.name, desc: i.desc, price: i.price,
+          emoji: i.emoji, bg: i.bg, tag: i.gen || i.tag || '',
+          status: 'approved', active: true, creator: 'ToyTools', submittedAt: Date.now(),
         });
       });
       add(B.SKINS, 'skin');
@@ -130,27 +126,27 @@
     return items;
   }
 
-  function saveMarketItems(items) {
-    save(KEYS.market, items);
+  async function saveMarketItems(items) {
+    if (FS()) await FS().saveMarketItems(items);
+    else { save(KEYS.market, items); }
     B.renderToyMarket?.();
   }
 
   function getUsers() {
+    if (FS()) return FS().getUsers();
     let users = load(KEYS.users, null);
     if (!users) {
       users = [
         { id: 'u1', nick: '장난감초보', email: 'demo1@toy-tools.com', cash: 12500, status: 'normal', joinedAt: '2026-06-15', role: 'user' },
         { id: 'u2', nick: '스킨마스터', email: 'creator@toy-tools.com', cash: 48200, status: 'normal', joinedAt: '2026-05-20', role: 'creator' },
-        { id: 'u3', nick: '악성유저99', email: 'bad@example.com', cash: 0, status: 'banned', joinedAt: '2026-07-01', role: 'user' },
-        { id: 'u4', nick: '탈퇴회원', email: 'left@example.com', cash: 0, status: 'withdrawn', joinedAt: '2026-04-10', role: 'user' },
       ];
       save(KEYS.users, users);
     }
     return users;
   }
 
-  function saveUsers(users) {
-    save(KEYS.users, users);
+  async function saveUsers(users) {
+    if (!FS()) save(KEYS.users, users);
   }
 
   function getStats() {
@@ -159,9 +155,9 @@
     const posts = getAllPosts();
     const pendingMarket = market.filter((i) => i.status === 'pending').length;
     const totalCoins = users.filter((u) => u.status === 'normal').reduce((s, u) => s + (u.cash || 0), 0);
-    const dl = load(KEYS.downloadsToday, { date: B.formatDate(new Date()), count: 42 });
+    const dl = FS() ? FS().getDailyDownloads() : load(KEYS.downloadsToday, { date: B.formatDate(new Date()), count: 42 });
     const today = B.formatDate(new Date());
-    if (dl.date !== today) {
+    if (!FS() && dl.date !== today) {
       dl.date = today;
       dl.count = Math.floor(Math.random() * 30) + 15;
       save(KEYS.downloadsToday, dl);
@@ -171,11 +167,12 @@
       newPosts: posts.filter((p) => (p.date || '').startsWith(today.slice(0, 7))).length,
       pendingReview: pendingMarket + getDevSubmissions().filter((s) => s.status === 'pending').length,
       totalCoins,
-      dailyDownloads: dl.count,
+      dailyDownloads: dl.count || 0,
     };
   }
 
   function getAllPosts() {
+    if (FS()) return FS().getPosts(B);
     const boards = B.getBoards();
     let all = [];
     boards.forEach((b) => {
@@ -195,19 +192,19 @@
   }
 
   function getDevSubmissions() {
-    return load(KEYS.devSubmissions, []);
+    return FS() ? FS().getDevSubmissions() : load(KEYS.devSubmissions, []);
   }
 
   function getInquiries() {
-    return load(KEYS.inquiries, []);
+    return FS() ? FS().getInquiries() : load(KEYS.inquiries, []);
   }
 
   function getPayouts() {
+    if (FS()) return FS().getPayouts();
     let payouts = load(KEYS.payouts, null);
     if (!payouts) {
       payouts = [
         { id: 'pay1', nick: '스킨마스터', email: 'creator@toy-tools.com', amount: 50000, coins: 50000, status: 'pending', requestedAt: '2026-07-25' },
-        { id: 'pay2', nick: '크리에이터A', email: 'a@example.com', amount: 12000, coins: 12000, status: 'approved', requestedAt: '2026-07-20' },
       ];
       save(KEYS.payouts, payouts);
     }
@@ -215,36 +212,44 @@
   }
 
   function getBlacklist() {
-    return load(KEYS.blacklist, []);
+    return FS() ? FS().getBlacklist() : load(KEYS.blacklist, []);
   }
 
   function getMuted() {
-    return load(KEYS.muted, []);
+    return FS() ? FS().getMuted() : load(KEYS.muted, []);
   }
 
   function getChangelog() {
-    return load(KEYS.changelog, B.getChangelogDefault());
+    return FS() ? FS().getChangelog() : load(KEYS.changelog, B.getChangelogDefault());
   }
 
   function getFaq() {
-    return load(KEYS.faq, B.getFaqDefault());
+    return FS() ? FS().getFaq() : load(KEYS.faq, B.getFaqDefault());
   }
 
   function getDownloadInfo() {
-    return load(KEYS.download, {
-      version: 'v1.0.0',
-      url: '#',
-      notes: 'Windows 10/11 · 포터블 .exe · 무설치',
+    return FS() ? FS().getDownload() : load(KEYS.download, {
+      version: 'v1.0.0', url: '#', notes: 'Windows 10/11 · 포터블 .exe · 무설치',
     });
   }
 
   function getSettings() {
-    return load(KEYS.settings, {
-      maintenance: false,
-      registrationOpen: true,
-      marketOpen: true,
-      notice: '',
+    return FS() ? FS().getSettings() : load(KEYS.settings, {
+      maintenance: false, registrationOpen: true, marketOpen: true, notice: '',
     });
+  }
+
+  async function persistConfig(partial) {
+    if (FS()) await FS().saveConfig(partial);
+    else {
+      if (partial.settings) save(KEYS.settings, partial.settings);
+      if (partial.download) save(KEYS.download, partial.download);
+      if (partial.blacklist) save(KEYS.blacklist, partial.blacklist);
+      if (partial.muted) save(KEYS.muted, partial.muted);
+      if (partial.changelog) save(KEYS.changelog, partial.changelog);
+      if (partial.faq) save(KEYS.faq, partial.faq);
+      if (partial.dailyDownloads) save(KEYS.downloadsToday, partial.dailyDownloads);
+    }
   }
 
   // ── Confirm modal ──
@@ -390,10 +395,15 @@
       btn.addEventListener('click', () => { marketStatus = btn.dataset.ms; renderMarketplace(el); });
     });
     el.querySelectorAll('[data-toggle-active]').forEach((inp) => {
-      inp.addEventListener('change', () => {
+      inp.addEventListener('change', async () => {
         const items = getMarketItems();
         const item = items.find((i) => i.id === inp.dataset.toggleActive);
-        if (item) { item.active = inp.checked; saveMarketItems(items); B.showToast(item.active ? '노출 활성화' : '노출 숨김'); }
+        if (item) {
+          item.active = inp.checked;
+          if (FS()) await FS().upsertMarketItem(item);
+          else await saveMarketItems(items);
+          B.showToast(item.active ? '노출 활성화' : '노출 숨김');
+        }
       });
     });
     el.querySelectorAll('[data-approve]').forEach((btn) => {
@@ -415,8 +425,9 @@
         title: '아이템 강제 삭제',
         message: '이 마켓 아이템을 영구 삭제합니다. 계속하시겠습니까?',
         danger: true,
-        onConfirm: () => {
-          saveMarketItems(getMarketItems().filter((i) => i.id !== btn.dataset.delItem));
+        onConfirm: async () => {
+          if (FS()) await FS().deleteMarketItem(btn.dataset.delItem);
+          else await saveMarketItems(getMarketItems().filter((i) => i.id !== btn.dataset.delItem));
           B.showToast('아이템이 삭제되었습니다.');
           renderMarketplace(el);
         },
@@ -431,13 +442,14 @@
     return { pending: '대기중', approved: '승인됨', rejected: '반려됨' }[s] || s;
   }
 
-  function updateMarketStatus(id, status) {
+  async function updateMarketStatus(id, status) {
     const items = getMarketItems();
     const item = items.find((i) => i.id === id);
     if (item) {
       item.status = status;
       if (status === 'approved') item.active = true;
-      saveMarketItems(items);
+      if (FS()) await FS().upsertMarketItem(item);
+      else await saveMarketItems(items);
       B.showToast(status === 'approved' ? '승인되었습니다.' : '반려되었습니다.');
       renderPanel();
     }
@@ -454,16 +466,19 @@
       <div><label class="form-label">썸네일 (이모지)</label><input type="text" id="sadmin-item-emoji" class="form-input" value="${item.emoji || ''}" maxlength="4" /></div>
       <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mt-2">저장</button>
     `;
-    form.onsubmit = (e) => {
+    form.onsubmit = async (e) => {
       e.preventDefault();
       item.name = document.getElementById('sadmin-item-name').value.trim();
       item.price = Number(document.getElementById('sadmin-item-price').value) || 0;
       item.desc = document.getElementById('sadmin-item-desc').value.trim();
       item.emoji = document.getElementById('sadmin-item-emoji').value.trim();
-      const items = getMarketItems();
-      const idx = items.findIndex((i) => i.id === id);
-      if (idx >= 0) items[idx] = item;
-      saveMarketItems(items);
+      if (FS()) await FS().upsertMarketItem(item);
+      else {
+        const items = getMarketItems();
+        const idx = items.findIndex((i) => i.id === id);
+        if (idx >= 0) items[idx] = item;
+        await saveMarketItems(items);
+      }
       B.closeModal('modal-sadmin-item');
       B.showToast('아이템이 수정되었습니다.');
       renderPanel();
@@ -545,28 +560,30 @@
       e.target.reset();
       renderCommunity(el);
     }, { once: true });
-    document.getElementById('sadmin-ban-form')?.addEventListener('submit', (e) => {
+    document.getElementById('sadmin-ban-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const nick = document.getElementById('sadmin-ban-nick').value.trim();
       if (!nick) return;
-      const list = getBlacklist();
-      if (!list.includes(nick)) { list.push(nick); save(KEYS.blacklist, list); }
+      const list = [...getBlacklist()];
+      if (!list.includes(nick)) list.push(nick);
+      await persistConfig({ blacklist: list });
       B.showToast(`${nick} 블랙리스트 등록`);
       renderCommunity(el);
     }, { once: true });
-    document.getElementById('sadmin-mute-btn')?.addEventListener('click', () => {
+    document.getElementById('sadmin-mute-btn')?.addEventListener('click', async () => {
       const nick = document.getElementById('sadmin-ban-nick').value.trim();
       if (!nick) return;
-      const list = getMuted();
-      if (!list.includes(nick)) { list.push(nick); save(KEYS.muted, list); }
+      const list = [...getMuted()];
+      if (!list.includes(nick)) list.push(nick);
+      await persistConfig({ muted: list });
       B.showToast(`${nick} Mute 처리`);
       renderCommunity(el);
     }, { once: true });
     el.querySelectorAll('[data-unban]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const nick = btn.dataset.unban;
-        if (btn.dataset.type === 'black') save(KEYS.blacklist, getBlacklist().filter((n) => n !== nick));
-        else save(KEYS.muted, getMuted().filter((n) => n !== nick));
+        if (btn.dataset.type === 'black') await persistConfig({ blacklist: getBlacklist().filter((n) => n !== nick) });
+        else await persistConfig({ muted: getMuted().filter((n) => n !== nick) });
         renderCommunity(el);
       });
     });
@@ -702,65 +719,73 @@
       </div>
     `;
 
-    document.getElementById('sadmin-dl-form')?.addEventListener('submit', (e) => {
+    document.getElementById('sadmin-dl-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      save(KEYS.download, {
-        version: document.getElementById('sadmin-dl-ver').value.trim(),
-        url: document.getElementById('sadmin-dl-url').value.trim(),
-        notes: document.getElementById('sadmin-dl-notes').value.trim(),
+      await persistConfig({
+        download: {
+          version: document.getElementById('sadmin-dl-ver').value.trim(),
+          url: document.getElementById('sadmin-dl-url').value.trim(),
+          notes: document.getElementById('sadmin-dl-notes').value.trim(),
+        },
       });
       B.renderResources?.();
       B.showToast('다운로드 정보가 저장되었습니다.');
     }, { once: true });
-    document.getElementById('sadmin-changelog-add')?.addEventListener('submit', (e) => {
+    document.getElementById('sadmin-changelog-add')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const list = getChangelog();
+      const list = [...getChangelog()];
       list.unshift({
         version: document.getElementById('sadmin-cl-ver').value.trim(),
         date: B.formatDate(new Date()),
         notes: document.getElementById('sadmin-cl-notes').value.trim(),
       });
-      save(KEYS.changelog, list);
+      await persistConfig({ changelog: list });
       B.renderResources?.();
       renderDownloads(el);
     }, { once: true });
     el.querySelectorAll('[data-del-cl]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const list = getChangelog();
+      btn.addEventListener('click', async () => {
+        const list = [...getChangelog()];
         list.splice(Number(btn.dataset.delCl), 1);
-        save(KEYS.changelog, list);
+        await persistConfig({ changelog: list });
         B.renderResources?.();
         renderDownloads(el);
       });
     });
-    document.getElementById('sadmin-faq-add')?.addEventListener('submit', (e) => {
+    document.getElementById('sadmin-faq-add')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const list = getFaq();
+      const list = [...getFaq()];
       list.push({
         q: document.getElementById('sadmin-faq-q').value.trim(),
         a: document.getElementById('sadmin-faq-a').value.trim(),
       });
-      save(KEYS.faq, list);
+      await persistConfig({ faq: list });
       B.renderResources?.();
       renderDownloads(el);
     }, { once: true });
     el.querySelectorAll('[data-del-faq]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const list = getFaq();
+      btn.addEventListener('click', async () => {
+        const list = [...getFaq()];
         list.splice(Number(btn.dataset.delFaq), 1);
-        save(KEYS.faq, list);
+        await persistConfig({ faq: list });
         B.renderResources?.();
         renderDownloads(el);
       });
     });
     el.querySelectorAll('[data-reply-inq]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const reply = prompt('관리자 답변을 입력하세요:');
         if (!reply) return;
-        const list = getInquiries();
-        const item = list.find((q) => q.id === btn.dataset.replyInq);
-        if (item) { item.answered = true; item.reply = reply; item.repliedAt = B.formatDate(new Date()); }
-        save(KEYS.inquiries, list);
+        if (FS()) {
+          await FS().updateInquiry(btn.dataset.replyInq, {
+            answered: true, reply, repliedAt: B.formatDate(new Date()),
+          });
+        } else {
+          const list = getInquiries();
+          const item = list.find((q) => q.id === btn.dataset.replyInq);
+          if (item) { item.answered = true; item.reply = reply; item.repliedAt = B.formatDate(new Date()); }
+          save(KEYS.inquiries, list);
+        }
         B.showToast('답변이 등록되었습니다.');
         renderDownloads(el);
       });
@@ -860,11 +885,12 @@
         title: user.status === 'banned' ? '정지 해제' : '계정 정지',
         message: user.status === 'banned' ? '이 계정의 정지를 해제합니다.' : '이 계정을 일시 정지합니다.',
         danger: user.status !== 'banned',
-        onConfirm: () => {
+        onConfirm: async () => {
           const users = getUsers();
           const u = users.find((x) => x.id === userId);
           if (u) u.status = u.status === 'banned' ? 'normal' : 'banned';
-          saveUsers(users);
+          if (FS()) await FS().updateUser(userId, { status: u?.status });
+          else await saveUsers(users);
           B.closeModal('modal-sadmin-user');
           B.showToast('계정 상태가 변경되었습니다.');
           renderPanel();
@@ -876,11 +902,12 @@
         title: '영구 탈퇴 처리',
         message: '이 계정을 탈퇴 처리합니다. 복구가 어렵습니다.',
         danger: true,
-        onConfirm: () => {
+        onConfirm: async () => {
           const users = getUsers();
           const u = users.find((x) => x.id === userId);
           if (u) u.status = 'withdrawn';
-          saveUsers(users);
+          if (FS()) await FS().updateUser(userId, { status: 'withdrawn' });
+          else await saveUsers(users);
           B.closeModal('modal-sadmin-user');
           B.showToast('탈퇴 처리되었습니다.');
           renderPanel();
@@ -893,12 +920,16 @@
     B.openModal('modal-sadmin-user');
   }
 
-  function adjustUserCoin(userId, delta) {
+  async function adjustUserCoin(userId, delta) {
     const users = getUsers();
     const u = users.find((x) => x.id === userId);
     if (!u) return;
-    u.cash = Math.max(0, (u.cash || 0) + delta);
-    saveUsers(users);
+    const newCash = Math.max(0, (u.cash || 0) + delta);
+    if (FS()) await FS().updateUser(userId, { cash: newCash });
+    else {
+      u.cash = newCash;
+      await saveUsers(users);
+    }
     B.showToast(`${delta > 0 ? '지급' : '차감'} 완료: ${Math.abs(delta).toLocaleString()}P`);
     openUserModal(userId);
   }
@@ -998,38 +1029,47 @@
     });
   }
 
-  function updateSubmission(id, status) {
+  async function updateSubmission(id, status) {
     const subs = getDevSubmissions();
     const s = subs.find((x) => x.id === id);
-    if (s) {
+    if (!s) return;
+    if (FS()) await FS().updateDevSubmission(id, { status });
+    else {
       s.status = status;
       save(KEYS.devSubmissions, subs);
-      if (status === 'approved') {
-        const items = getMarketItems();
-        items.push({
-          id: 'sub_' + id,
-          type: s.itemType === 'extension' ? 'extension' : s.itemType === 'game' ? 'game' : 'skin',
-          name: s.name,
-          desc: s.desc || '',
-          price: 3000,
-          emoji: '📦',
-          bg: 'linear-gradient(135deg, #312e81, #1e1b4b)',
-          status: 'approved',
-          active: true,
-          creator: s.nick || s.email || 'Creator',
-          submittedAt: s.submittedAt || Date.now(),
-        });
-        saveMarketItems(items);
-      }
-      B.showToast(status === 'approved' ? '신청이 승인되었습니다.' : '신청이 반려되었습니다.');
-      renderPanel();
     }
+    if (status === 'approved') {
+      const newItem = {
+        id: 'sub_' + id,
+        type: s.itemType === 'extension' ? 'extension' : s.itemType === 'game' ? 'game' : 'skin',
+        name: s.name,
+        desc: s.desc || '',
+        price: 3000,
+        emoji: '📦',
+        bg: 'linear-gradient(135deg, #312e81, #1e1b4b)',
+        status: 'approved',
+        active: true,
+        creator: s.nick || s.email || 'Creator',
+        submittedAt: s.submittedAt || Date.now(),
+      };
+      if (FS()) await FS().upsertMarketItem(newItem);
+      else {
+        const items = getMarketItems();
+        items.push(newItem);
+        await saveMarketItems(items);
+      }
+    }
+    B.showToast(status === 'approved' ? '신청이 승인되었습니다.' : '신청이 반려되었습니다.');
+    renderPanel();
   }
 
-  function updatePayout(id, status) {
-    const payouts = getPayouts();
-    const p = payouts.find((x) => x.id === id);
-    if (p) { p.status = status; save(KEYS.payouts, payouts); }
+  async function updatePayout(id, status) {
+    if (FS()) await FS().updatePayout(id, { status });
+    else {
+      const payouts = getPayouts();
+      const p = payouts.find((x) => x.id === id);
+      if (p) { p.status = status; save(KEYS.payouts, payouts); }
+    }
     B.showToast(status === 'approved' ? '정산이 승인되었습니다.' : '정산이 거절되었습니다.');
     renderPanel();
   }
@@ -1081,12 +1121,14 @@
       </div>
     `;
 
-    document.getElementById('sadmin-save-settings')?.addEventListener('click', () => {
-      save(KEYS.settings, {
-        maintenance: document.getElementById('sadmin-set-maint').checked,
-        registrationOpen: document.getElementById('sadmin-set-reg').checked,
-        marketOpen: document.getElementById('sadmin-set-market').checked,
-        notice: document.getElementById('sadmin-set-notice').value.trim(),
+    document.getElementById('sadmin-save-settings')?.addEventListener('click', async () => {
+      await persistConfig({
+        settings: {
+          maintenance: document.getElementById('sadmin-set-maint').checked,
+          registrationOpen: document.getElementById('sadmin-set-reg').checked,
+          marketOpen: document.getElementById('sadmin-set-market').checked,
+          notice: document.getElementById('sadmin-set-notice').value.trim(),
+        },
       });
       B.showToast('시스템 설정이 저장되었습니다.');
     });
@@ -1124,24 +1166,33 @@
       return getBlacklist().includes(nick);
     },
     addDevSubmission(data) {
-      const subs = getDevSubmissions();
-      subs.unshift({ ...data, id: 'sub_' + Date.now(), status: 'pending', submittedAt: Date.now() });
-      save(KEYS.devSubmissions, subs);
+      if (FS()) FS().addDevSubmission(data);
+      else {
+        const subs = getDevSubmissions();
+        subs.unshift({ ...data, id: 'sub_' + Date.now(), status: 'pending', submittedAt: Date.now() });
+        save(KEYS.devSubmissions, subs);
+      }
     },
     addInquiry(data) {
-      const list = getInquiries();
-      list.unshift({ ...data, id: 'inq_' + Date.now(), answered: false, createdAt: Date.now() });
-      save(KEYS.inquiries, list);
+      if (FS()) FS().addInquiry(data);
+      else {
+        const list = getInquiries();
+        list.unshift({ ...data, id: 'inq_' + Date.now(), answered: false, createdAt: Date.now() });
+        save(KEYS.inquiries, list);
+      }
     },
     getChangelog,
     getFaq,
     getDownloadInfo,
     incrementDownloadCount() {
-      const dl = load(KEYS.downloadsToday, { date: B.formatDate(new Date()), count: 0 });
-      const today = B.formatDate(new Date());
-      if (dl.date !== today) { dl.date = today; dl.count = 0; }
-      dl.count += 1;
-      save(KEYS.downloadsToday, dl);
+      if (FS()) FS().incrementDownloadCount(B.formatDate);
+      else {
+        const dl = load(KEYS.downloadsToday, { date: B.formatDate(new Date()), count: 0 });
+        const today = B.formatDate(new Date());
+        if (dl.date !== today) { dl.date = today; dl.count = 0; }
+        dl.count += 1;
+        save(KEYS.downloadsToday, dl);
+      }
     },
   };
 
