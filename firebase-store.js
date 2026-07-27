@@ -18,6 +18,7 @@
     download: 'toytools_sadmin_download',
     downloadsToday: 'toytools_downloads_today',
     devSubmissions: 'toytools_dev_submissions',
+    extensions: 'toytools_extensions',
   };
 
   let bridge = null;
@@ -40,6 +41,7 @@
     inquiries: [],
     payouts: [],
     devSubmissions: [],
+    extensions: [],
     settings: { maintenance: false, registrationOpen: true, marketOpen: true, notice: '' },
     download: { version: 'v1.0.0', url: '#', notes: 'Windows 10/11 · 포터블 .exe · 무설치' },
     blacklist: [],
@@ -216,6 +218,7 @@
     if (!lsLoad(LS.users, null)) lsSave(LS.users, cache.users);
 
     cache.inquiries = lsLoad(LS.inquiries, []);
+    cache.extensions = lsLoad(LS.extensions, []);
     cache.payouts = lsLoad(LS.payouts, null) || [
       { id: 'pay1', nick: '스킨마스터', email: 'creator@toy-tools.com', amount: 50000, coins: 50000, status: 'pending', requestedAt: '2026-07-25' },
     ];
@@ -319,6 +322,10 @@
       }),
       db.collection('dev_submissions').onSnapshot((snap) => {
         cache.devSubmissions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        notify();
+      }),
+      db.collection('extensions').onSnapshot((snap) => {
+        cache.extensions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         notify();
       }),
       db.collection('payouts').onSnapshot((snap) => {
@@ -503,6 +510,48 @@
     }
   }
 
+  async function uploadExtensionFile(file, uid) {
+    const storage = bridge?.getStorage?.();
+    if (!storage || !ready) {
+      throw new Error('Firebase Storage가 설정되지 않았습니다.');
+    }
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `extensions/${uid}/${Date.now()}_${safeName}`;
+    const ref = storage.ref(path);
+    const snapshot = await ref.put(file, {
+      contentType: 'text/x-python',
+      customMetadata: { uploadedBy: uid },
+    });
+    return snapshot.ref.getDownloadURL();
+  }
+
+  async function addExtensionPack(data) {
+    const item = {
+      name: data.name,
+      desc: data.desc,
+      price: Number(data.price) || 0,
+      category: data.category,
+      fileUrl: data.fileUrl,
+      author: data.author,
+      approved: false,
+      createdAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
+    };
+    if (ready && db) {
+      const docRef = await db.collection('extensions').add(item);
+      return docRef.id;
+    }
+    const id = 'ext_' + Date.now();
+    cache.extensions.unshift({ ...item, id });
+    lsSave(LS.extensions, cache.extensions);
+    notify();
+    return id;
+  }
+
+  async function uploadExtensionPack({ name, category, desc, price, file, author, uid }) {
+    const fileUrl = await uploadExtensionFile(file, uid);
+    return addExtensionPack({ name, category, desc, price, fileUrl, author });
+  }
+
   async function updateDevSubmission(id, data) {
     if (ready && db) {
       await db.collection('dev_submissions').doc(id).update(data);
@@ -572,6 +621,7 @@
     getInquiries: () => cache.inquiries,
     getPayouts: () => cache.payouts,
     getDevSubmissions: () => cache.devSubmissions,
+    getExtensions: () => cache.extensions,
     getSettings: () => cache.settings,
     getDownload: () => cache.download,
     getBlacklist: () => cache.blacklist,
@@ -588,6 +638,8 @@
     updateInquiry,
     addDevSubmission,
     updateDevSubmission,
+    uploadExtensionPack,
+    addExtensionPack,
     updatePayout,
     incrementDownloadCount,
   };

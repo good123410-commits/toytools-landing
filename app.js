@@ -24,6 +24,7 @@
   let firebaseApp = null;
   let auth = null;
   let db = null;
+  let storage = null;
   let firebaseReady = false;
   let currentUser = null;
   let userProfile = null;
@@ -194,6 +195,9 @@
       firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
       auth = firebase.auth();
       db = firebase.firestore();
+      if (typeof firebase.storage === 'function') {
+        storage = firebase.storage();
+      }
       firebaseReady = true;
       console.info('[ToyTools] Firebase 연결됨 — project:', FIREBASE_CONFIG.projectId);
 
@@ -268,7 +272,10 @@
       isAdmin: () => isAdmin,
       isFirebaseReady: () => firebaseReady,
       getDb: () => db,
+      getStorage: () => storage,
       getFirestore: () => (typeof firebase !== 'undefined' ? firebase.firestore : null),
+      getCurrentUser: () => currentUser,
+      getUserProfile: () => userProfile,
       getBoards: () => boards,
       getChangelogDefault: () => CHANGELOG,
       getFaqDefault: () => FAQ_ITEMS,
@@ -1673,41 +1680,131 @@
   }
 
   function bindDeveloperCenter() {
-    $('#dev-submit-form')?.addEventListener('submit', (e) => {
+    const fileInput = $('#dev-item-file');
+    const dropZone = $('#dev-file-drop');
+    const fileNameEl = $('#dev-file-name');
+
+    function setDevFile(file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.py')) {
+        showToast('.py 파일만 업로드할 수 있습니다.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('파일 크기는 5MB 이하여야 합니다.');
+        return;
+      }
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      if (fileInput) fileInput.files = dt.files;
+      if (fileNameEl) {
+        fileNameEl.textContent = file.name;
+        fileNameEl.classList.remove('hidden');
+      }
+      dropZone?.classList.add('has-file');
+    }
+
+    dropZone?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) setDevFile(file);
+    });
+
+    if (dropZone) {
+      ['dragenter', 'dragover'].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dropZone.classList.add('drag-over');
+        });
+      });
+      ['dragleave', 'drop'].forEach((evt) => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (evt === 'drop' && e.dataTransfer?.files?.length) {
+            setDevFile(e.dataTransfer.files[0]);
+          }
+          dropZone.classList.remove('drag-over');
+        });
+      });
+    }
+
+    $('#dev-submit-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!currentUser) {
-        showToast('로그인 후 등록 신청이 가능합니다.');
+        showToast('로그인 후 확장팩 업로드가 가능합니다.');
         openModal('modal-login');
         return;
       }
-      const itemType = $('#dev-item-type')?.value;
+
       const name = $('#dev-item-name')?.value?.trim();
+      const category = $('#dev-item-category')?.value;
       const desc = $('#dev-item-desc')?.value?.trim();
-      const url = $('#dev-item-url')?.value?.trim();
-      if (window.SuperAdmin) {
-        window.SuperAdmin.addDevSubmission({
-          itemType,
-          type: itemType,
-          name,
-          desc,
-          url,
-          nick: userProfile?.nickname || currentUser?.email,
-          email: currentUser?.email,
-        });
-      } else if (window.FirebaseStore) {
-        window.FirebaseStore.addDevSubmission({
-          itemType,
-          type: itemType,
-          name,
-          desc,
-          url,
-          nick: userProfile?.nickname || currentUser?.email,
-          email: currentUser?.email,
-        });
+      const price = Number($('#dev-item-price')?.value);
+      const file = fileInput?.files?.[0];
+
+      if (!name || !category || !desc) {
+        showToast('필수 항목을 모두 입력해 주세요.');
+        return;
       }
-      showToast('등록 신청이 접수되었습니다. 심사 후 연락드립니다.');
-      e.target.reset();
+      if (!Number.isFinite(price) || price < 0) {
+        showToast('가격(DP)을 올바르게 입력해 주세요.');
+        return;
+      }
+      if (!file) {
+        showToast('.py 스크립트 파일을 첨부해 주세요.');
+        return;
+      }
+      if (!file.name.toLowerCase().endsWith('.py')) {
+        showToast('.py 파일만 업로드할 수 있습니다.');
+        return;
+      }
+
+      const submitBtn = $('#dev-submit-btn');
+      const prevLabel = submitBtn?.textContent;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = '업로드 중...';
+      }
+
+      try {
+        const author = userProfile?.nickname
+          ? `${userProfile.nickname} (${currentUser.uid})`
+          : (currentUser.email || currentUser.uid);
+
+        if (!window.FirebaseStore?.uploadExtensionPack) {
+          throw new Error('FirebaseStore가 초기화되지 않았습니다.');
+        }
+
+        await window.FirebaseStore.uploadExtensionPack({
+          name,
+          category,
+          desc,
+          price,
+          file,
+          author,
+          uid: currentUser.uid,
+        });
+
+        showToast('관리자 검수 후 마켓에 등록됩니다.');
+        e.target.reset();
+        if (fileNameEl) {
+          fileNameEl.textContent = '';
+          fileNameEl.classList.add('hidden');
+        }
+        dropZone?.classList.remove('has-file');
+      } catch (err) {
+        console.error('[ToyTools] 확장팩 업로드 실패:', err);
+        showToast(err.message || '업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = prevLabel || '확장팩 업로드';
+        }
+      }
     });
+
     $$('.doc-link').forEach((link) => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -1715,6 +1812,7 @@
       });
     });
     updateDeveloperDashboard();
+    lucide.createIcons();
   }
 
   function updateDeveloperDashboard() {
