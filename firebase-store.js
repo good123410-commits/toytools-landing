@@ -717,6 +717,33 @@
   }
 
   const UPLOAD_TIMEOUT_MS = 120000;
+  const EXTENSION_STORAGE_TIMEOUT_MS = 6000;
+  const EXT_STORAGE_SKIP_KEY = 'toytools_skip_ext_storage';
+
+  function shouldTryExtensionStorage() {
+    try {
+      if (sessionStorage.getItem(EXT_STORAGE_SKIP_KEY) === '1') return false;
+      // Firebase Storage 미설정/CORS 환경 대응: 기본은 Firestore 인라인 저장
+      if (localStorage.getItem('toytools_ext_storage_enabled') !== '1') return false;
+    } catch (_) { /* ignore */ }
+    return !!bridge?.getStorage?.();
+  }
+
+  function markExtensionStorageSkipped(reason) {
+    try {
+      sessionStorage.setItem(EXT_STORAGE_SKIP_KEY, '1');
+    } catch (_) { /* ignore */ }
+    console.warn('[FirebaseStore] Storage 업로드 건너뜀 — Firestore 인라인 저장 사용:', reason || 'CORS/네트워크');
+  }
+
+  function getFirestore() {
+    return db || bridge?.getDb?.() || null;
+  }
+
+  function canWriteFirestore() {
+    const firestore = getFirestore();
+    return !!(firestore && bridge?.isFirebaseReady?.());
+  }
 
   function withTimeout(promise, ms, message) {
     return Promise.race([
@@ -737,6 +764,9 @@
   }
 
   async function uploadExtensionFile(file, uid) {
+    if (!shouldTryExtensionStorage()) {
+      return null;
+    }
     const storage = bridge?.getStorage?.();
     if (!storage) {
       console.warn('[FirebaseStore] Storage 인스턴스 없음 — Firestore 인라인 저장으로 전환합니다.');
@@ -757,20 +787,22 @@
       });
       const snapshot = await withTimeout(
         uploadTask,
-        UPLOAD_TIMEOUT_MS,
-        '파일 업로드 시간이 초과되었습니다. 네트워크를 확인해 주세요.'
+        EXTENSION_STORAGE_TIMEOUT_MS,
+        'Storage 업로드 시간 초과'
       );
       return await snapshot.ref.getDownloadURL();
     } catch (err) {
       console.error('[FirebaseStore] uploadExtensionFile 실패:', path, err);
+      markExtensionStorageSkipped(err?.message || 'upload failed');
       return null;
     }
   }
 
   async function saveExtensionInlineFallback({ name, category, desc, price, fileUrl, codeBody, fileName, author, authorUid, extensionId }) {
-    if (!ready || !db || !codeBody) return;
+    const firestore = getFirestore();
+    if (!canWriteFirestore() || !codeBody) return;
     try {
-      await db.collection('market_items').add({
+      await firestore.collection('market_items').add({
         name,
         desc,
         price: Number(price) || 0,
@@ -809,8 +841,8 @@
         approved: false,
         createdAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
       };
-      if (ready && db) {
-        const docRef = await db.collection('extensions').add(item);
+      if (canWriteFirestore()) {
+        const docRef = await getFirestore().collection('extensions').add(item);
         notify();
         return docRef.id;
       }
@@ -835,29 +867,32 @@
       throw new Error('.py 스크립트 파일을 첨부해 주세요.');
     }
     try {
-      let fileUrl = '';
-      let codeBody = '';
       const fileName = file.name || 'extension.py';
 
+      // 1) 파일 내용을 먼저 읽어 Storage 실패 시에도 즉시 저장 가능하게 함
+      const codeBody = await readFileAsText(file);
+      if (!codeBody.trim()) {
+        throw new Error('파일 내용이 비어 있습니다.');
+      }
+      if (codeBody.length > 900000) {
+        throw new Error('파일이 너무 큽니다(약 900KB 이하). Storage 설정 후 다시 시도해 주세요.');
+      }
+
+      // 2) Storage는 선택 사항 — CORS/미설정 시 6초 내 실패 후 인라인 저장
+      let fileUrl = '';
       try {
         fileUrl = await uploadExtensionFile(file, uid) || '';
       } catch (storageErr) {
         console.error('[FirebaseStore] Storage 업로드 실패:', storageErr);
+        markExtensionStorageSkipped(storageErr?.message);
         fileUrl = '';
       }
 
+      const storageMode = fileUrl ? 'storage' : 'inline';
       if (!fileUrl) {
-        codeBody = await readFileAsText(file);
-        if (!codeBody.trim()) {
-          throw new Error('파일 내용이 비어 있습니다.');
-        }
-        if (codeBody.length > 900000) {
-          throw new Error('파일이 너무 큽니다(약 900KB 이하). Storage 설정 후 다시 시도해 주세요.');
-        }
-        console.info('[FirebaseStore] Storage 미사용 — code_body를 Firestore에 직접 저장합니다.');
+        console.info('[FirebaseStore] Firestore 인라인(code_body) 저장으로 진행합니다.');
       }
 
-      const storageMode = fileUrl ? 'storage' : 'inline';
       let extensionId = '';
 
       try {
@@ -878,7 +913,7 @@
         throw new Error(firestoreErr.message || '확장팩 정보 저장에 실패했습니다.');
       }
 
-      if (codeBody) {
+      if (storageMode === 'inline' && codeBody) {
         await saveExtensionInlineFallback({
           name, category, desc, price, fileUrl, codeBody, fileName, author, authorUid: uid, extensionId,
         });
