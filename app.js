@@ -156,6 +156,7 @@
     initTermsContent();
     bindModals();
     bindAuthUI();
+    bindMyPageUI();
     bindChargeUI();
     bindAdminUI();
     renderToyCards();
@@ -370,16 +371,26 @@
     }
   }
 
+  function showAuthView(view) {
+    const loginView = $('#auth-view-login');
+    const signupView = $('#auth-view-signup');
+    const isSignup = view === 'signup';
+    loginView?.classList.toggle('hidden', isSignup);
+    signupView?.classList.toggle('hidden', !isSignup);
+  }
+
+  function openAuthModal(view = 'login') {
+    showAuthView(view);
+    openModal('modal-login');
+  }
+
   function bindAuthUI() {
-    const openLogin = () => openModal('modal-login');
-    const openSignup = () => openModal('modal-signup');
+    const openLogin = () => openAuthModal('login');
 
     $('#btn-login')?.addEventListener('click', openLogin);
-    $('#btn-signup')?.addEventListener('click', openSignup);
     $('#btn-login-mobile')?.addEventListener('click', openLogin);
-    $('#btn-signup-mobile')?.addEventListener('click', openSignup);
-    $('#switch-to-signup')?.addEventListener('click', () => { closeAllModals(); openSignup(); });
-    $('#switch-to-login')?.addEventListener('click', () => { closeAllModals(); openLogin(); });
+    $('#switch-to-signup')?.addEventListener('click', () => showAuthView('signup'));
+    $('#switch-to-login')?.addEventListener('click', () => showAuthView('login'));
     $('#btn-logout')?.addEventListener('click', () => signOut().then(() => showToast('로그아웃되었습니다.')));
     $('#btn-logout-mobile')?.addEventListener('click', () => signOut().then(() => showToast('로그아웃되었습니다.')));
     $('#btn-mypage')?.addEventListener('click', openMyPage);
@@ -426,36 +437,238 @@
     return map[code] || err.message || '인증 오류가 발생했습니다.';
   }
 
-  function openMyPage() {
-    if (!currentUser || !userProfile) { showToast('로그인이 필요합니다.'); return; }
-    $('#mypage-nickname').textContent = userProfile.nickname || '-';
-    $('#mypage-email').textContent = userProfile.email || currentUser.email || '-';
-    $('#mypage-cash').textContent = `${(userProfile.cash || 0).toLocaleString()}P`;
+  function switchMyPageTab(tab) {
+    $$('.mypage-tab').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.mypageTab === tab);
+    });
+    $$('.mypage-panel').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.id !== `mypage-panel-${tab}`);
+    });
+    if (tab === 'assets') loadUserTransactions();
+    if (tab === 'purchases') renderMyPagePurchases();
+  }
+
+  function renderMyPagePurchases() {
+    if (!userProfile) return;
     const skinsEl = $('#mypage-skins');
+    const itemsEl = $('#mypage-items');
+    const ownedSkins = userProfile.ownedSkins || ['default'];
     if (skinsEl) {
-      const owned = userProfile.ownedSkins || ['default'];
-      skinsEl.innerHTML = owned.map((id) => {
-        const skin = SKINS.find((s) => s.id === id);
-        return `<span class="skin-owned-badge">${skin ? skin.emoji + ' ' + skin.name : '🎨 ' + id}</span>`;
-      }).join('') || '<span class="text-sm text-gray-400">기본 스킨</span>';
+      skinsEl.innerHTML = ownedSkins.map((id) => {
+        const skin = findMarketItem('skin', id) || SKINS.find((s) => s.id === id);
+        return `<span class="skin-owned-badge">${skin ? `${skin.emoji} ${skin.name}` : `🎨 ${id}`}</span>`;
+      }).join('') || '<span class="text-sm text-gray-400">보유 스킨이 없습니다.</span>';
     }
+    if (itemsEl) {
+      const ownedItems = userProfile.ownedItems || [];
+      if (!ownedItems.length) {
+        itemsEl.innerHTML = '<p class="text-sm text-gray-400">보유한 확장팩/미니게임이 없습니다.</p>';
+        return;
+      }
+      itemsEl.innerHTML = ownedItems.map((id) => {
+        const item = findMarketItem('extension', id)
+          || findMarketItem('game', id)
+          || EXTENSIONS.find((i) => i.id === id)
+          || MINIGAMES.find((i) => i.id === id);
+        return `<div class="mypage-owned-card">${item ? `${item.emoji} ${item.name}` : `📦 ${id}`}</div>`;
+      }).join('');
+    }
+    lucide.createIcons();
+  }
+
+  function formatTransactionDate(ts) {
+    if (!ts) return '-';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    if (Number.isNaN(d.getTime())) return '-';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+
+  async function loadUserTransactions() {
+    const tbody = $('#mypage-transactions-body');
+    if (!tbody) return;
+    if (!currentUser || !db) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">로그인 후 내역을 확인할 수 있습니다.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">불러오는 중…</td></tr>';
+    try {
+      let snap;
+      try {
+        snap = await db.collection('transactions')
+          .where('userId', '==', currentUser.uid)
+          .orderBy('createdAt', 'desc')
+          .limit(50)
+          .get();
+      } catch (_) {
+        snap = await db.collection('transactions')
+          .where('userId', '==', currentUser.uid)
+          .limit(50)
+          .get();
+      }
+      if (snap.empty) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">내역이 없습니다.</td></tr>';
+        return;
+      }
+      const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      rows.sort((a, b) => {
+        const ta = a.createdAt?.toMillis?.() || a.createdAt || 0;
+        const tb = b.createdAt?.toMillis?.() || b.createdAt || 0;
+        return tb - ta;
+      });
+      tbody.innerHTML = rows.map((row) => {
+        const typeLabel = row.type === 'charge' ? '충전' : row.type === 'purchase' ? '구매' : (row.type || '-');
+        const amount = Number(row.amount) || 0;
+        const sign = row.type === 'purchase' ? '-' : '+';
+        const amountClass = row.type === 'purchase' ? 'text-red-400' : 'text-green-400';
+        return `<tr>
+          <td>${escapeHtml(formatTransactionDate(row.createdAt))}</td>
+          <td>${escapeHtml(typeLabel)}</td>
+          <td>${escapeHtml(row.description || '-')}</td>
+          <td class="text-right ${amountClass}">${sign}${Math.abs(amount).toLocaleString()} DP</td>
+        </tr>`;
+      }).join('');
+    } catch (err) {
+      console.error('[ToyTools] transactions load failed:', err);
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-gray-500 py-6">내역을 불러오지 못했습니다.</td></tr>';
+    }
+  }
+
+  async function recordTransaction({ type, amount, description }) {
+    if (!db || !currentUser) return;
+    await db.collection('transactions').add({
+      userId: currentUser.uid,
+      type,
+      amount: Number(amount) || 0,
+      description: description || '',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+
+  async function updateNickname() {
+    if (!currentUser || !userProfile || !db) {
+      showToast('로그인이 필요합니다.');
+      return;
+    }
+    const nickname = $('#mypage-nickname-input')?.value?.trim();
+    if (!nickname) {
+      showToast('닉네임을 입력해 주세요.');
+      return;
+    }
+    if (nickname.length > 12) {
+      showToast('닉네임은 12자 이하입니다.');
+      return;
+    }
+    await db.collection('users').doc(currentUser.uid).update({
+      nickname,
+      display_name: nickname,
+    });
+    await loadUserProfile(currentUser.uid);
+    renderMyPage();
+    showToast('닉네임이 저장되었습니다.');
+  }
+
+  async function changePassword() {
+    if (!currentUser || !auth) {
+      showToast('로그인이 필요합니다.');
+      return;
+    }
+    const currentPw = $('#mypage-current-password')?.value || '';
+    const newPw = $('#mypage-new-password')?.value || '';
+    const newPw2 = $('#mypage-new-password2')?.value || '';
+    if (!currentPw || !newPw) {
+      showToast('현재 비밀번호와 새 비밀번호를 입력해 주세요.');
+      return;
+    }
+    if (newPw !== newPw2) {
+      showToast('새 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    if (newPw.length < 6) {
+      showToast('비밀번호는 6자 이상이어야 합니다.');
+      return;
+    }
+    try {
+      const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, currentPw);
+      await currentUser.reauthenticateWithCredential(credential);
+      await currentUser.updatePassword(newPw);
+      $('#mypage-current-password').value = '';
+      $('#mypage-new-password').value = '';
+      $('#mypage-new-password2').value = '';
+      showToast('비밀번호가 변경되었습니다.');
+    } catch (err) {
+      showToast(getAuthErrorMessage(err));
+    }
+  }
+
+  async function sendPasswordResetEmail() {
+    if (!auth || !currentUser?.email) {
+      showToast('로그인이 필요합니다.');
+      return;
+    }
+    try {
+      await auth.sendPasswordResetEmail(currentUser.email);
+      showToast('비밀번호 재설정 이메일을 발송했습니다.');
+    } catch (err) {
+      showToast(getAuthErrorMessage(err));
+    }
+  }
+
+  function renderMyPage() {
+    if (!currentUser || !userProfile) return;
+    const cash = `${(userProfile.cash || 0).toLocaleString()}P`;
+    const email = userProfile.email || currentUser.email || '-';
+    const nick = userProfile.nickname || '유저';
+
+    const headerEmail = $('#mypage-header-email');
+    const cashEl = $('#mypage-cash');
+    const assetsCash = $('#mypage-assets-cash');
+    const emailInput = $('#mypage-email');
+    const nickInput = $('#mypage-nickname-input');
+
+    if (headerEmail) headerEmail.textContent = email;
+    if (cashEl) cashEl.textContent = cash;
+    if (assetsCash) assetsCash.textContent = cash;
+    if (emailInput) emailInput.value = email;
+    if (nickInput) nickInput.value = nick;
+
+    renderMyPagePurchases();
+    loadUserTransactions();
+  }
+
+  function bindMyPageUI() {
+    $$('.mypage-tab').forEach((btn) => {
+      btn.addEventListener('click', () => switchMyPageTab(btn.dataset.mypageTab));
+    });
+    $('#btn-save-nickname')?.addEventListener('click', () => {
+      updateNickname().catch((err) => showToast(err.message || '닉네임 저장 실패'));
+    });
+    $('#btn-change-password')?.addEventListener('click', () => {
+      changePassword().catch((err) => showToast(err.message || '비밀번호 변경 실패'));
+    });
+    $('#btn-send-reset-email')?.addEventListener('click', () => {
+      sendPasswordResetEmail().catch((err) => showToast(err.message || '이메일 발송 실패'));
+    });
+  }
+
+  function openMyPage() {
+    if (!currentUser || !userProfile) {
+      showToast('로그인이 필요합니다.');
+      openAuthModal('login');
+      return;
+    }
+    switchMyPageTab('profile');
+    renderMyPage();
     openModal('modal-mypage');
+    lucide.createIcons();
   }
 
   // ═══════════════════ CASH & PAYMENT ═══════════════════
   function bindChargeUI() {
-    $('#btn-open-charge')?.addEventListener('click', () => {
-      closeAllModals();
-      selectedChargeAmount = 0;
+    $('#modal-mypage')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.charge-option');
+      if (!btn) return;
+      selectedChargeAmount = Number(btn.dataset.amount);
       updateChargeSelection();
-      openModal('modal-charge');
-    });
-
-    $$('.charge-option').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        selectedChargeAmount = Number(btn.dataset.amount);
-        updateChargeSelection();
-      });
     });
 
     $('#btn-pay-test')?.addEventListener('click', () => processCharge(true));
@@ -463,7 +676,7 @@
   }
 
   function updateChargeSelection() {
-    $$('.charge-option').forEach((btn) => {
+    $$('#modal-mypage .charge-option').forEach((btn) => {
       btn.classList.toggle('selected', Number(btn.dataset.amount) === selectedChargeAmount);
     });
     const sel = $('#charge-selected');
@@ -477,9 +690,11 @@
     if (!selectedChargeAmount) return;
 
     if (isTest) {
-      await addCash(selectedChargeAmount);
-      closeAllModals();
-      showToast(`테스트 결제 완료: +${selectedChargeAmount.toLocaleString()}P`);
+      const charged = selectedChargeAmount;
+      await addCash(charged);
+      selectedChargeAmount = 0;
+      updateChargeSelection();
+      showToast(`테스트 결제 완료: +${charged.toLocaleString()}P`);
       return;
     }
 
@@ -511,8 +726,14 @@
     if (!db || !currentUser) return;
     const ref = db.collection('users').doc(currentUser.uid);
     await ref.update({ cash: firebase.firestore.FieldValue.increment(amount) });
+    await recordTransaction({
+      type: 'charge',
+      amount,
+      description: `DP 충전 +${amount.toLocaleString()} DP`,
+    });
     await loadUserProfile(currentUser.uid);
-    openMyPage();
+    renderMyPage();
+    switchMyPageTab('assets');
   }
 
   function handlePaymentCallback() {
@@ -554,6 +775,11 @@
         cash: data.cash - skin.price,
         ownedSkins: firebase.firestore.FieldValue.arrayUnion(skinId),
       });
+    });
+    await recordTransaction({
+      type: 'purchase',
+      amount: skin.price,
+      description: `스킨 구매 — ${skin.name}`,
     });
     await loadUserProfile(currentUser.uid);
     renderToyMarket();
@@ -1311,6 +1537,7 @@
     document.body.style.overflow = '';
     $('#board-write-form')?.reset();
     clearWriteAttachments();
+    showAuthView('login');
   }
 
   // ═══════════════════ NAVIGATION ═══════════════════
@@ -1587,6 +1814,11 @@
         ownedItems: firebase.firestore.FieldValue.arrayUnion(itemId),
       });
     });
+    await recordTransaction({
+      type: 'purchase',
+      amount: item.price,
+      description: `${item.type === 'extension' ? '확장팩' : '미니게임'} 구매 — ${item.name}`,
+    });
     await loadUserProfile(currentUser.uid);
     renderToyMarket();
     showToast(`${item.name} 구매가 완료되었습니다.`);
@@ -1743,7 +1975,7 @@
       e.preventDefault();
       if (!currentUser) {
         showToast('로그인 후 확장팩 업로드가 가능합니다.');
-        openModal('modal-login');
+        openAuthModal('login');
         return;
       }
 

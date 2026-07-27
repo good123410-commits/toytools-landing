@@ -70,8 +70,7 @@
 
         <!-- Auth Area (Desktop) -->
         <div id="auth-guest" class="hidden md:flex items-center gap-2 ml-2">
-          <button id="btn-login" class="auth-btn auth-btn-outline">로그인</button>
-          <button id="btn-signup" class="auth-btn auth-btn-primary">회원가입</button>
+          <button id="btn-login" class="auth-btn auth-btn-primary">로그인</button>
         </div>
         <div id="auth-user" class="hidden md:flex items-center gap-2 ml-2 text-sm">
           <span class="auth-user-nick font-semibold" id="header-nickname">닉네임</span>
@@ -94,9 +93,8 @@
       <a href="#developer" class="nav-link mobile-nav-item" data-section="developer">개발자센터</a>
       <a href="#resources" class="nav-link mobile-nav-item" data-section="resources">자료실</a>
       <a href="#admin" id="admin-mobile-nav" class="nav-link mobile-nav-item hidden" data-section="admin">슈퍼 관리자</a>
-      <div id="mobile-auth-guest" class="pt-3 border-t border-white/10 flex gap-2">
-        <button id="btn-login-mobile" class="auth-btn auth-btn-outline flex-1 justify-center">로그인</button>
-        <button id="btn-signup-mobile" class="auth-btn auth-btn-primary flex-1 justify-center">회원가입</button>
+      <div id="mobile-auth-guest" class="pt-3 border-t border-white/10">
+        <button id="btn-login-mobile" class="auth-btn auth-btn-primary w-full justify-center">로그인</button>
       </div>
       <div id="mobile-auth-user" class="hidden pt-3 border-t border-white/10 space-y-2">
         <div class="flex items-center justify-between text-sm font-semibold px-2">
@@ -582,6 +580,7 @@
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-content max-w-md">
       <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div id="auth-view-login">
       <h2 class="text-xl font-semibold text-white mb-6">로그인</h2>
       <form id="login-form" class="space-y-4">
         <div>
@@ -597,14 +596,9 @@
       <p class="text-center text-sm text-gray-500 mt-4">
         계정이 없으신가요? <button type="button" id="switch-to-signup" class="link-subtle">회원가입</button>
       </p>
-    </div>
-  </div>
+      </div>
 
-  <!-- Signup Modal -->
-  <div id="modal-signup" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal-content max-w-md">
-      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <div id="auth-view-signup" class="hidden">
       <h2 class="text-xl font-semibold text-white mb-6">회원가입</h2>
       <form id="signup-form" class="space-y-4">
         <div>
@@ -632,56 +626,100 @@
       <p class="text-center text-sm text-gray-500 mt-4">
         이미 계정이 있으신가요? <button type="button" id="switch-to-login" class="link-subtle">로그인</button>
       </p>
+      </div>
     </div>
   </div>
 
   <!-- My Page Modal -->
   <div id="modal-mypage" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal-content max-w-md">
+    <div class="modal-content max-w-2xl mypage-modal">
       <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
-      <h2 class="text-xl font-semibold text-white mb-2">마이페이지</h2>
-      <div class="mypage-profile mb-6">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">닉네임</p>
-        <p class="font-semibold text-lg text-white" id="mypage-nickname">-</p>
-        <p class="text-xs text-gray-500 uppercase tracking-wide mt-3">이메일</p>
-        <p class="text-sm text-gray-400" id="mypage-email">-</p>
-        <div class="cash-display mt-4">
+      <div class="mypage-modal-header">
+        <div>
+          <h2 class="text-xl font-semibold text-white">마이페이지</h2>
+          <p class="text-sm text-gray-400 mt-1" id="mypage-header-email">-</p>
+        </div>
+        <div class="mypage-header-cash">
+          <span class="text-xs text-gray-500 uppercase tracking-wide">보유 DP</span>
           <span class="text-2xl font-semibold text-studio-accent" id="mypage-cash">0P</span>
-          <span class="text-sm text-gray-500 ml-2">보유 캐시</span>
         </div>
       </div>
-      <button type="button" id="btn-open-charge" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mb-4">
-        <i data-lucide="wallet" class="w-4 h-4"></i> 캐시 충전하기
-      </button>
-      <div>
-        <p class="form-label mb-2">보유 스킨</p>
-        <div id="mypage-skins" class="flex flex-wrap gap-2"></div>
-      </div>
-    </div>
-  </div>
 
-  <!-- Cash Charge Modal -->
-  <div id="modal-charge" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal-content max-w-md">
-      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
-      <h2 class="text-xl font-semibold text-white mb-2">캐시 충전</h2>
-      <p class="text-sm text-gray-400 mb-6">충전한 캐시로 토이마켓에서 스킨·미니게임·확장팩을 구매할 수 있습니다.</p>
-      <div class="grid grid-cols-2 gap-3 mb-6" id="charge-amounts">
-        <button type="button" class="charge-option" data-amount="1000">1,000P<br><span class="text-xs text-gray-400">₩1,000</span></button>
-        <button type="button" class="charge-option" data-amount="5000">5,000P<br><span class="text-xs text-gray-400">₩5,000</span></button>
-        <button type="button" class="charge-option" data-amount="10000">10,000P<br><span class="text-xs text-gray-400">₩10,000</span></button>
-        <button type="button" class="charge-option" data-amount="30000">30,000P<br><span class="text-xs text-gray-400">₩30,000</span></button>
+      <div class="mypage-tabs" role="tablist">
+        <button type="button" class="mypage-tab active" data-mypage-tab="profile" role="tab">프로필 관리</button>
+        <button type="button" class="mypage-tab" data-mypage-tab="assets" role="tab">자산 &amp; DP 충전</button>
+        <button type="button" class="mypage-tab" data-mypage-tab="purchases" role="tab">내 구매 항목</button>
       </div>
-      <p class="text-center text-sm mb-4 text-gray-400">선택 금액: <strong id="charge-selected" class="text-studio-accent">0P</strong></p>
-      <button type="button" id="btn-pay-toss" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mb-2" disabled>
-        토스페이먼츠로 결제
-      </button>
-      <button type="button" id="btn-pay-test" class="auth-btn auth-btn-outline w-full justify-center text-sm" disabled>
-        🧪 테스트 결제 (개발용)
-      </button>
-      <p class="text-xs text-gray-400 text-center mt-3">실제 PG 연동 시 토스페이먼츠 팝업이 열립니다.</p>
+
+      <div id="mypage-panel-profile" class="mypage-panel" role="tabpanel">
+        <div class="mypage-section">
+          <label class="form-label" for="mypage-email">이메일</label>
+          <input type="email" id="mypage-email" class="form-input" readonly disabled />
+          <p class="text-xs text-gray-500 mt-1">이메일은 변경할 수 없습니다.</p>
+        </div>
+        <div class="mypage-section">
+          <label class="form-label" for="mypage-nickname-input">닉네임</label>
+          <div class="flex gap-2">
+            <input type="text" id="mypage-nickname-input" class="form-input flex-1" maxlength="12" placeholder="닉네임" />
+            <button type="button" id="btn-save-nickname" class="auth-btn auth-btn-primary auth-btn-sm shrink-0">저장</button>
+          </div>
+        </div>
+        <div class="mypage-section">
+          <p class="form-label mb-2">비밀번호 변경</p>
+          <div class="space-y-3">
+            <input type="password" id="mypage-current-password" class="form-input" placeholder="현재 비밀번호" minlength="6" />
+            <input type="password" id="mypage-new-password" class="form-input" placeholder="새 비밀번호 (6자 이상)" minlength="6" />
+            <input type="password" id="mypage-new-password2" class="form-input" placeholder="새 비밀번호 확인" minlength="6" />
+            <button type="button" id="btn-change-password" class="auth-btn auth-btn-outline w-full justify-center">비밀번호 변경</button>
+            <button type="button" id="btn-send-reset-email" class="link-subtle text-sm w-full text-center">비밀번호 재설정 이메일 받기</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="mypage-panel-assets" class="mypage-panel hidden" role="tabpanel">
+        <div class="cash-display mb-5">
+          <span class="text-sm text-gray-500">현재 잔여 DP</span>
+          <span class="text-3xl font-semibold text-studio-accent block mt-1" id="mypage-assets-cash">0P</span>
+        </div>
+        <p class="form-label mb-3">DP 충전 옵션</p>
+        <div class="grid grid-cols-2 gap-3 mb-4" id="mypage-charge-amounts">
+          <button type="button" class="charge-option" data-amount="1000">1,000 DP<br><span class="text-xs text-gray-400">₩1,000</span></button>
+          <button type="button" class="charge-option" data-amount="5000">5,000 DP<br><span class="text-xs text-gray-400">₩5,000</span></button>
+          <button type="button" class="charge-option" data-amount="10000">10,000 DP<br><span class="text-xs text-gray-400">₩10,000</span></button>
+          <button type="button" class="charge-option" data-amount="30000">30,000 DP<br><span class="text-xs text-gray-400">₩30,000</span></button>
+        </div>
+        <p class="text-center text-sm mb-4 text-gray-400">선택 금액: <strong id="charge-selected" class="text-studio-accent">0P</strong></p>
+        <button type="button" id="btn-pay-toss" class="toy-btn-3d toy-btn-3d-sm w-full justify-center mb-2" disabled>토스페이먼츠로 결제</button>
+        <button type="button" id="btn-pay-test" class="auth-btn auth-btn-outline w-full justify-center text-sm mb-6" disabled>테스트 결제 (개발용)</button>
+        <p class="form-label mb-2">구매 및 충전 내역</p>
+        <div class="mypage-table-wrap">
+          <table class="mypage-table">
+            <thead>
+              <tr>
+                <th>일시</th>
+                <th>유형</th>
+                <th>내용</th>
+                <th class="text-right">금액</th>
+              </tr>
+            </thead>
+            <tbody id="mypage-transactions-body">
+              <tr><td colspan="4" class="text-center text-gray-500 py-6">내역이 없습니다.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="mypage-panel-purchases" class="mypage-panel hidden" role="tabpanel">
+        <div class="mypage-section">
+          <p class="form-label mb-2">보유 스킨</p>
+          <div id="mypage-skins" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div class="mypage-section mt-4">
+          <p class="form-label mb-2">보유 확장팩 / 미니게임</p>
+          <div id="mypage-items" class="mypage-owned-grid"></div>
+        </div>
+      </div>
     </div>
   </div>
 
