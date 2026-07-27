@@ -50,6 +50,27 @@
   let db = null;
   let storage = null;
   let firebaseReady = false;
+
+  function ensureStorage() {
+    if (storage) return storage;
+    if (typeof firebase === 'undefined' || !firebase.apps?.length) return null;
+    try {
+      if (typeof firebase.storage === 'function') {
+        storage = firebase.storage();
+      } else if (typeof firebase.app?.().storage === 'function') {
+        storage = firebase.app().storage();
+      }
+      if (storage) {
+        console.info('[ToyTools] Firebase Storage 연결됨 — bucket:', FIREBASE_CONFIG.storageBucket);
+      }
+    } catch (err) {
+      console.error('[ToyTools] Firebase Storage 초기화 실패:', err);
+    }
+    if (!storage) {
+      console.warn('[ToyTools] Storage 미사용 — 확장팩은 Firestore 인라인(code_body)으로 저장됩니다.');
+    }
+    return storage;
+  }
   let currentUser = null;
   let userProfile = null;
   let isAdmin = false;
@@ -235,9 +256,7 @@
       }
       auth = firebase.auth();
       db = firebase.firestore();
-      if (typeof firebase.storage === 'function') {
-        storage = firebase.storage();
-      }
+      ensureStorage();
       firebaseReady = true;
       console.info('[ToyTools] Firebase 연결됨 — project:', FIREBASE_CONFIG.projectId);
 
@@ -340,7 +359,7 @@
       isAdmin: () => isAdmin,
       isFirebaseReady: () => firebaseReady,
       getDb: () => db,
-      getStorage: () => storage,
+      getStorage: () => ensureStorage(),
       getFirestore: () => (typeof firebase !== 'undefined' ? firebase.firestore : null),
       getCurrentUser: () => currentUser,
       getUserProfile: () => userProfile,
@@ -2414,7 +2433,7 @@ def run(context):
           uid: currentUser.uid,
         });
 
-        showToast('확장팩이 성공적으로 등록되었습니다!');
+        showToast('확장팩 업로드가 완료되었습니다! (승인 대기중)');
         form.reset();
         resetDevFileInput();
         updateDeveloperDashboard();

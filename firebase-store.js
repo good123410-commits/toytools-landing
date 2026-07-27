@@ -727,12 +727,20 @@
     ]);
   }
 
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = () => reject(new Error('파일을 읽을 수 없습니다.'));
+      reader.readAsText(file, 'UTF-8');
+    });
+  }
+
   async function uploadExtensionFile(file, uid) {
     const storage = bridge?.getStorage?.();
-    if (!storage || !ready) {
-      const err = new Error('Firebase Storage가 설정되지 않았습니다.');
-      console.error('[FirebaseStore] uploadExtensionFile:', err);
-      throw err;
+    if (!storage) {
+      console.warn('[FirebaseStore] Storage 인스턴스 없음 — Firestore 인라인 저장으로 전환합니다.');
+      return null;
     }
     if (!file?.name?.toLowerCase().endsWith('.py')) {
       const err = new Error('.py 파일만 업로드할 수 있습니다.');
@@ -755,7 +763,32 @@
       return await snapshot.ref.getDownloadURL();
     } catch (err) {
       console.error('[FirebaseStore] uploadExtensionFile 실패:', path, err);
-      throw err;
+      return null;
+    }
+  }
+
+  async function saveExtensionInlineFallback({ name, category, desc, price, fileUrl, codeBody, fileName, author, authorUid, extensionId }) {
+    if (!ready || !db || !codeBody) return;
+    try {
+      await db.collection('market_items').add({
+        name,
+        desc,
+        price: Number(price) || 0,
+        category,
+        type: 'extension',
+        content: codeBody,
+        code_body: codeBody,
+        fileUrl: fileUrl || '',
+        fileName: fileName || '',
+        author,
+        authorUid: authorUid || '',
+        extensionId: extensionId || '',
+        storageMode: fileUrl ? 'storage' : 'inline',
+        approved: false,
+        createdAt: fs ? fs.FieldValue.serverTimestamp() : Date.now(),
+      });
+    } catch (err) {
+      console.error('[FirebaseStore] market_items 인라인 fallback 저장 실패:', err);
     }
   }
 
@@ -767,6 +800,10 @@
         price: Number(data.price) || 0,
         category: data.category,
         fileUrl: data.fileUrl || '',
+        fileName: data.fileName || '',
+        code_body: data.codeBody || '',
+        content: data.codeBody || '',
+        storageMode: data.storageMode || (data.fileUrl ? 'storage' : 'inline'),
         author: data.author || '',
         authorUid: data.authorUid || '',
         approved: false,
@@ -794,22 +831,60 @@
       console.error('[FirebaseStore] uploadExtensionPack:', err);
       throw err;
     }
+    if (!file) {
+      throw new Error('.py 스크립트 파일을 첨부해 주세요.');
+    }
     try {
       let fileUrl = '';
+      let codeBody = '';
+      const fileName = file.name || 'extension.py';
+
       try {
-        fileUrl = await uploadExtensionFile(file, uid);
+        fileUrl = await uploadExtensionFile(file, uid) || '';
       } catch (storageErr) {
         console.error('[FirebaseStore] Storage 업로드 실패:', storageErr);
-        throw new Error(storageErr.message || '파일 업로드에 실패했습니다.');
+        fileUrl = '';
       }
+
+      if (!fileUrl) {
+        codeBody = await readFileAsText(file);
+        if (!codeBody.trim()) {
+          throw new Error('파일 내용이 비어 있습니다.');
+        }
+        if (codeBody.length > 900000) {
+          throw new Error('파일이 너무 큽니다(약 900KB 이하). Storage 설정 후 다시 시도해 주세요.');
+        }
+        console.info('[FirebaseStore] Storage 미사용 — code_body를 Firestore에 직접 저장합니다.');
+      }
+
+      const storageMode = fileUrl ? 'storage' : 'inline';
+      let extensionId = '';
+
       try {
-        return await addExtensionPack({
-          name, category, desc, price, fileUrl, author, authorUid: uid,
+        extensionId = await addExtensionPack({
+          name,
+          category,
+          desc,
+          price,
+          fileUrl,
+          codeBody,
+          fileName,
+          storageMode,
+          author,
+          authorUid: uid,
         });
       } catch (firestoreErr) {
         console.error('[FirebaseStore] Firestore extensions 저장 실패:', firestoreErr);
         throw new Error(firestoreErr.message || '확장팩 정보 저장에 실패했습니다.');
       }
+
+      if (codeBody) {
+        await saveExtensionInlineFallback({
+          name, category, desc, price, fileUrl, codeBody, fileName, author, authorUid: uid, extensionId,
+        });
+      }
+
+      return { id: extensionId, storageMode };
     } catch (err) {
       console.error('[FirebaseStore] uploadExtensionPack 실패:', err);
       throw err;
