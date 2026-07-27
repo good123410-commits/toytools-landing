@@ -326,7 +326,18 @@
     }
     const FS = window.FirebaseStore;
     if (FS?.isReady()) {
-      const list = catalogType === 'skin' ? FS.getSkins() : FS.getToys().filter((i) => i.type === catalogType);
+      if (catalogType === 'skin') {
+        const official = FS.getSkins();
+        const creator = FS.getToys().filter((i) => i.type === 'skin');
+        const merged = [...official, ...creator];
+        const seen = new Set();
+        return merged.filter((i) => {
+          if (seen.has(i.id)) return false;
+          seen.add(i.id);
+          return i.status === 'approved' && i.approved !== false && i.active !== false;
+        });
+      }
+      const list = FS.getToys().filter((i) => i.type === catalogType);
       return list.filter((i) => i.status === 'approved' && i.approved !== false && i.active !== false);
     }
     if (catalogType === 'skin') return SKINS;
@@ -2256,13 +2267,36 @@
     `).join('');
   }
 
-  const DEV_CATEGORY_LABELS = {
-    productivity: '생산성',
-    data: '데이터',
-    media: '미디어',
-    utility: '유틸리티',
-    automation: '자동화',
+  const DEV_PRODUCT_TYPES = {
+    extension: '확장팩',
+    skin: '스킨팩',
+    game: '미니게임',
   };
+
+  const DEV_CATEGORIES = {
+    extension: [
+      { value: 'productivity', label: '생산성' },
+      { value: 'data', label: '데이터' },
+      { value: 'media', label: '미디어' },
+      { value: 'utility', label: '유틸리티' },
+      { value: 'automation', label: '자동화' },
+    ],
+    skin: [
+      { value: 'dark_light', label: '다크/라이트' },
+      { value: 'neon_cyberpunk', label: '네온/사이버펑크' },
+      { value: 'minimal', label: '미니멀' },
+      { value: 'retro', label: '레트로' },
+    ],
+    game: [
+      { value: 'arcade', label: '아케이드' },
+      { value: 'puzzle', label: '퍼즐' },
+      { value: 'casual', label: '캐주얼' },
+    ],
+  };
+
+  const DEV_CATEGORY_LABELS = Object.fromEntries(
+    Object.values(DEV_CATEGORIES).flat().map((c) => [c.value, c.label])
+  );
 
   const SAMPLE_EXTENSION_PY = `# ToyTools Sample Extension
 # 확장팩 개발 템플릿 — 이 파일을 복사해 기능을 구현하세요.
@@ -2281,19 +2315,62 @@ def run(context):
 `;
 
   let devUploading = false;
-  let devPackType = 'script';
+  let devUploadFormat = 'script';
 
-  function getDevPackType() {
-    const checked = document.querySelector('input[name="dev-pack-type"]:checked');
+  function getDevProductType() {
+    const value = $('#dev-product-type')?.value;
+    return DEV_CATEGORIES[value] ? value : 'extension';
+  }
+
+  function renderDevCategoryOptions(productType = getDevProductType()) {
+    const select = $('#dev-item-category');
+    if (!select) return;
+    const options = DEV_CATEGORIES[productType] || DEV_CATEGORIES.extension;
+    const prev = select.value;
+    select.innerHTML = '<option value="">카테고리 선택</option>' + options.map(
+      (opt) => `<option value="${escapeHtml(opt.value)}">${escapeHtml(opt.label)}</option>`
+    ).join('');
+    if (prev && options.some((opt) => opt.value === prev)) {
+      select.value = prev;
+    }
+  }
+
+  function updateDevSubmitLabel() {
+    const btn = $('#dev-submit-btn');
+    const label = $('#dev-submit-btn-label');
+    const productType = getDevProductType();
+    const text = `${DEV_PRODUCT_TYPES[productType] || '상품'} 업로드`;
+    if (btn) btn.dataset.defaultLabel = text;
+    if (label && !btn?.disabled) label.textContent = text;
+  }
+
+  function setDevProductType(productType) {
+    const select = $('#dev-product-type');
+    if (select && select.value !== productType) select.value = productType;
+    renderDevCategoryOptions(productType);
+    updateDevSubmitLabel();
+    const desc = $('#dev-item-desc');
+    if (desc) {
+      const placeholders = {
+        extension: '확장팩 기능 및 사용 방법을 설명해 주세요',
+        skin: '스킨 테마 컨셉, 적용 방법을 설명해 주세요',
+        game: '미니게임 규칙 및 플레이 방법을 설명해 주세요',
+      };
+      desc.placeholder = placeholders[productType] || placeholders.extension;
+    }
+  }
+
+  function getDevUploadFormat() {
+    const checked = document.querySelector('input[name="dev-upload-format"]:checked');
     return checked?.value === 'package' ? 'package' : 'script';
   }
 
-  function setDevPackType(type) {
-    devPackType = type === 'package' ? 'package' : 'script';
+  function setDevUploadFormat(type) {
+    devUploadFormat = type === 'package' ? 'package' : 'script';
     const scriptPanel = $('#dev-panel-script');
     const packagePanel = $('#dev-panel-package');
-    scriptPanel?.classList.toggle('hidden', devPackType !== 'script');
-    packagePanel?.classList.toggle('hidden', devPackType !== 'package');
+    scriptPanel?.classList.toggle('hidden', devUploadFormat !== 'script');
+    packagePanel?.classList.toggle('hidden', devUploadFormat !== 'package');
     hideDevScanWarning();
     lucide.createIcons();
   }
@@ -2321,7 +2398,7 @@ def run(context):
     if (label) {
       label.textContent = loading
         ? '업로드 중...'
-        : (btn.dataset.defaultLabel || '확장팩 업로드');
+        : (btn.dataset.defaultLabel || '상품 업로드');
     }
   }
 
@@ -2359,22 +2436,31 @@ def run(context):
     if (scriptEntry) scriptEntry.value = 'main.py';
     if (packageEntry) packageEntry.value = 'main.py';
     hideDevScanWarning();
-    setDevPackType('script');
-    const scriptRadio = document.querySelector('input[name="dev-pack-type"][value="script"]');
+    setDevUploadFormat('script');
+    setDevProductType('extension');
+    const scriptRadio = document.querySelector('input[name="dev-upload-format"][value="script"]');
     if (scriptRadio) scriptRadio.checked = true;
+    const productSelect = $('#dev-product-type');
+    if (productSelect) productSelect.value = 'extension';
+    renderDevCategoryOptions('extension');
+    updateDevSubmitLabel();
   }
 
-  function getMyExtensions() {
+  function getMyCreatorProducts() {
     if (!currentUser || !window.FirebaseStore) return [];
+    if (typeof window.FirebaseStore.getCreatorProductsByUid === 'function') {
+      return window.FirebaseStore.getCreatorProductsByUid(currentUser.uid);
+    }
     if (typeof window.FirebaseStore.getStoreToysByUid === 'function') {
       return window.FirebaseStore.getStoreToysByUid(currentUser.uid);
     }
-    if (typeof window.FirebaseStore.getExtensionsByUid === 'function') {
-      return window.FirebaseStore.getExtensionsByUid(currentUser.uid);
-    }
     return (window.FirebaseStore.getToys?.() || []).filter(
-      (ext) => ext.type === 'extension' && ext.authorUid === currentUser.uid
+      (item) => item.authorUid === currentUser.uid
     );
+  }
+
+  function getMyExtensions() {
+    return getMyCreatorProducts();
   }
 
   function downloadSampleExtension() {
@@ -2400,13 +2486,13 @@ def run(context):
     if (!container) return;
 
     if (!currentUser) {
-      container.innerHTML = '<p class="dev-ext-empty">로그인 후 등록한 확장팩이 여기에 표시됩니다.</p>';
+      container.innerHTML = '<p class="dev-ext-empty">로그인 후 등록한 상품이 여기에 표시됩니다.</p>';
       return;
     }
 
-    const items = getMyExtensions();
+    const items = getMyCreatorProducts();
     if (!items.length) {
-      container.innerHTML = '<p class="dev-ext-empty">아직 등록한 확장팩이 없습니다. 왼쪽 폼에서 업로드해 보세요.</p>';
+      container.innerHTML = '<p class="dev-ext-empty">아직 등록한 상품이 없습니다. 왼쪽 폼에서 업로드해 보세요.</p>';
       return;
     }
 
@@ -2422,23 +2508,27 @@ def run(context):
         ? 'dev-ext-status--approved'
         : (status === 'rejected' ? 'dev-ext-status--rejected' : 'dev-ext-status--pending');
       const statusText = status === 'approved' ? '승인 완료' : (status === 'rejected' ? '반려됨' : '승인 대기');
-      const packType = ext.pack_type || (ext.package_url ? 'package' : 'script');
-      const packLabel = packType === 'package' ? '패키지 (.zip)' : '스크립트 (.py)';
-      const packBadgeClass = packType === 'package' ? 'dev-pack-badge dev-pack-badge--package' : 'dev-pack-badge';
+      const productType = ext.pack_type || ext.type || 'extension';
+      const productLabel = DEV_PRODUCT_TYPES[productType] || productType;
+      const deliveryType = ext.delivery_type || (ext.package_url ? 'package' : 'script');
+      const deliveryLabel = deliveryType === 'package' ? '패키지 (.zip)' : '스크립트 (.py)';
+      const packBadgeClass = deliveryType === 'package' ? 'dev-pack-badge dev-pack-badge--package' : 'dev-pack-badge';
       const entryPoint = ext.entry_point || 'main.py';
       const cat = DEV_CATEGORY_LABELS[ext.category] || ext.category || '-';
       const price = Number(ext.price) || 0;
       const dateStr = ext.createdAt ? toDisplayDate(ext.createdAt) : '';
       const descText = ext.description || ext.desc || '';
+      const itemTitle = ext.title || ext.name || '이름 없음';
       return `
         <article class="dev-ext-item">
           <div class="dev-ext-item-head">
-            <strong class="dev-ext-item-name">${escapeHtml(ext.name || '이름 없음')}</strong>
+            <strong class="dev-ext-item-name">${escapeHtml(itemTitle)}</strong>
             <span class="dev-ext-status ${statusClass}">${statusText}</span>
           </div>
           <p class="dev-ext-item-desc">${escapeHtml(descText)}</p>
           <div class="dev-ext-item-meta">
-            <span class="${packBadgeClass}">${escapeHtml(packLabel)}</span>
+            <span class="dev-pack-badge">${escapeHtml(productLabel)}</span>
+            <span class="${packBadgeClass}">${escapeHtml(deliveryLabel)}</span>
             <span>${escapeHtml(cat)}</span>
             <span>${price.toLocaleString()} DP</span>
             <span>진입점: ${escapeHtml(entryPoint)}</span>
@@ -2486,10 +2576,14 @@ def run(context):
     const zipNameEl = $('#dev-zip-name');
     const codeBodyEl = $('#dev-code-body');
 
-    $$('input[name="dev-pack-type"]').forEach((radio) => {
-      radio.addEventListener('change', () => setDevPackType(radio.value));
+    $$('input[name="dev-upload-format"]').forEach((radio) => {
+      radio.addEventListener('change', () => setDevUploadFormat(radio.value));
     });
-    setDevPackType(getDevPackType());
+    $('#dev-product-type')?.addEventListener('change', (e) => {
+      setDevProductType(e.target.value);
+    });
+    setDevProductType(getDevProductType());
+    setDevUploadFormat(getDevUploadFormat());
 
     function setDevFile(file) {
       if (!file) return;
@@ -2559,11 +2653,12 @@ def run(context):
       const category = $('#dev-item-category')?.value;
       const desc = $('#dev-item-desc')?.value?.trim();
       const price = Number($('#dev-item-price')?.value);
-      const packType = getDevPackType();
+      const productType = getDevProductType();
+      const deliveryType = getDevUploadFormat();
       const codeBody = $('#dev-code-body')?.value || '';
       const file = fileInput?.files?.[0];
       const packageFile = zipInput?.files?.[0];
-      const entryPoint = packType === 'package'
+      const entryPoint = deliveryType === 'package'
         ? ($('#dev-package-entry-point')?.value?.trim() || 'main.py')
         : ($('#dev-script-entry-point')?.value?.trim() || file?.name || 'main.py');
 
@@ -2576,7 +2671,7 @@ def run(context):
         return;
       }
 
-      if (packType === 'script') {
+      if (deliveryType === 'script') {
         if (!codeBody.trim() && !file) {
           showToast('파이썬 코드를 입력하거나 .py 파일을 첨부해 주세요.');
           return;
@@ -2591,28 +2686,30 @@ def run(context):
 
       try {
         const author = userProfile?.nickname || currentUser.email || currentUser.uid;
+        const uploadFn = window.FirebaseStore?.uploadCreatorProduct
+          || window.FirebaseStore?.uploadExtensionPack;
 
-        if (!window.FirebaseStore?.uploadExtensionPack) {
+        if (!uploadFn) {
           throw new Error('FirebaseStore가 초기화되지 않았습니다.');
         }
 
-        await window.FirebaseStore.uploadExtensionPack({
+        await uploadFn({
+          title: name,
           name,
           category,
           desc,
           price,
-          packType,
+          productType,
+          deliveryType,
           codeBody,
-          file: packType === 'script' ? file : null,
-          packageFile: packType === 'package' ? packageFile : null,
+          file: deliveryType === 'script' ? file : null,
+          packageFile: deliveryType === 'package' ? packageFile : null,
           entryPoint,
           author,
           uid: currentUser.uid,
         });
 
-        const successMsg = packType === 'package'
-          ? '확장팩 패키지 업로드가 완료되었습니다! (승인 대기중)'
-          : '확장팩 업로드가 완료되었습니다! (승인 대기중)';
+        const successMsg = `${DEV_PRODUCT_TYPES[productType] || '상품'} 업로드가 완료되었습니다! (승인 대기중)`;
         showToast(successMsg);
         form.reset();
         resetDevUploadForm();
@@ -2648,7 +2745,7 @@ def run(context):
       return;
     }
 
-    const mine = getMyExtensions();
+    const mine = getMyCreatorProducts();
     const pending = mine.filter((ext) => ext.status === 'pending' || (ext.approved !== true && ext.status !== 'rejected')).length;
     const approved = mine.filter((ext) => ext.approved === true || ext.status === 'approved').length;
 

@@ -121,11 +121,42 @@
   }
 
   function normalizeToyType(data) {
+    const packType = normalizeProductPackType(data);
+    if (packType === 'skin') return 'skin';
+    if (packType === 'game') return 'game';
     const raw = String(pick(data, 'type', 'itemType', 'toyType') || '').toLowerCase();
     if (raw.includes('extension') || raw.includes('확장')) return 'extension';
     if (raw.includes('game') || raw.includes('mini') || raw.includes('미니')) return 'game';
+    if (raw.includes('skin') || raw.includes('스킨')) return 'skin';
     if (pick(data, 'code_body', 'codeBody', 'package_url', 'packageUrl')) return 'extension';
     return 'game';
+  }
+
+  function normalizeProductPackType(data) {
+    const raw = String(pick(data, 'pack_type', 'packType') || '').toLowerCase();
+    if (raw === 'extension' || raw === 'skin' || raw === 'game') return raw;
+    if (raw === 'script' || raw === 'package') {
+      const type = String(pick(data, 'type', 'itemType') || '').toLowerCase();
+      if (type === 'skin') return 'skin';
+      if (type === 'game') return 'game';
+      return 'extension';
+    }
+    const type = String(pick(data, 'type', 'itemType') || '').toLowerCase();
+    if (type === 'skin') return 'skin';
+    if (type === 'game') return 'game';
+    return 'extension';
+  }
+
+  function normalizeDeliveryType(data) {
+    const raw = String(pick(data, 'delivery_type', 'deliveryType') || '').toLowerCase();
+    if (raw === 'script' || raw === 'package') return raw;
+    const legacyPack = String(pick(data, 'pack_type', 'packType') || '').toLowerCase();
+    if (legacyPack === 'script' || legacyPack === 'package') return legacyPack;
+    return pick(data, 'package_url', 'packageUrl') ? 'package' : 'script';
+  }
+
+  function productEmoji(packType) {
+    return { extension: '🧩', skin: '🎨', game: '🎮' }[packType] || '📦';
   }
 
   const DANGEROUS_CODE_PATTERNS = [
@@ -213,27 +244,32 @@
 
   function mapToy(id, data) {
     const type = normalizeToyType(data);
+    const packType = normalizeProductPackType(data);
+    const deliveryType = normalizeDeliveryType(data);
     const approved = data.approved === true;
     const status = pick(data, 'status') || (approved ? 'approved' : 'pending');
+    const title = pick(data, 'title', 'name') || '토이';
     return {
       id,
       _collection: COL.toys,
       type,
-      name: pick(data, 'name', 'title') || '토이',
+      name: title,
+      title,
       desc: pick(data, 'desc', 'description') || '',
       description: pick(data, 'description', 'desc') || '',
       price: Number(pick(data, 'price', 'point', 'points', 'cost') || 0),
       category: pick(data, 'category', 'tag', 'label') || '',
-      emoji: pick(data, 'emoji', 'icon') || '📦',
+      emoji: pick(data, 'emoji', 'icon') || productEmoji(packType),
       bg: pick(data, 'bg', 'background', 'backgroundGradient', 'thumbnailBg') || DEFAULT_BG,
-      tag: pick(data, 'tag', 'gen', 'category', 'label') || (type === 'extension' ? 'Extension' : 'Mini Game'),
+      tag: pick(data, 'tag', 'gen', 'category', 'label') || (type === 'extension' ? 'Extension' : type === 'skin' ? 'Skin' : 'Mini Game'),
       gen: pick(data, 'gen', 'tag', 'category', 'label') || '',
       status,
       approved,
       active: data.active !== false && data.enabled !== false && data.isActive !== false,
       author: pick(data, 'author', 'creator', 'createdBy') || 'ToyTools',
       authorUid: pick(data, 'authorUid', 'authorId', 'uid') || '',
-      pack_type: pick(data, 'pack_type', 'packType') || (pick(data, 'package_url', 'packageUrl') ? 'package' : 'script'),
+      pack_type: packType,
+      delivery_type: deliveryType,
       code_body: pick(data, 'code_body', 'codeBody', 'content') || '',
       package_url: pick(data, 'package_url', 'packageUrl', 'download_url', 'downloadUrl') || '',
       entry_point: pick(data, 'entry_point', 'entryPoint') || 'main.py',
@@ -357,16 +393,19 @@
   function toyToFirestore(item) {
     const raw = item._raw || {};
     const status = item.status || raw.status || (item.approved ? 'approved' : 'pending');
+    const packType = item.pack_type || raw.pack_type || normalizeProductPackType(item);
+    const title = item.title || item.name || raw.title || raw.name || '';
     return {
       ...raw,
-      name: item.name,
+      title,
+      name: title,
       desc: item.desc || item.description,
       description: item.description || item.desc || '',
       price: item.price,
-      emoji: item.emoji,
+      emoji: item.emoji || productEmoji(packType),
       bg: item.bg,
-      type: item.type,
-      itemType: item.type,
+      type: item.type || packType,
+      itemType: item.type || packType,
       category: item.category || item.tag || raw.category || '',
       tag: item.tag || item.gen || item.category,
       status,
@@ -374,7 +413,8 @@
       active: item.active !== false,
       author: item.author || item.creator || raw.author || 'ToyTools',
       authorUid: item.authorUid || raw.authorUid || '',
-      pack_type: item.pack_type || raw.pack_type || (item.package_url || raw.package_url ? 'package' : 'script'),
+      pack_type: packType,
+      delivery_type: item.delivery_type || raw.delivery_type || normalizeDeliveryType(item),
       code_body: item.code_body || raw.code_body || '',
       package_url: item.package_url || raw.package_url || '',
       entry_point: item.entry_point || raw.entry_point || 'main.py',
@@ -932,30 +972,39 @@
     }
   }
 
-  async function addExtensionPack(data) {
+  async function addCreatorProduct(data) {
     try {
-      const packType = data.packType === 'package' ? 'package' : 'script';
+      const productType = ['extension', 'skin', 'game'].includes(data.productType)
+        ? data.productType
+        : 'extension';
+      const deliveryType = data.deliveryType === 'package' ? 'package' : 'script';
       const entryPoint = (data.entryPoint || 'main.py').trim() || 'main.py';
+      const title = (data.title || data.name || '').trim();
+      const description = data.desc || data.description || '';
       const item = {
-        name: data.name || '',
+        title,
+        name: title,
         category: data.category || '',
-        description: data.desc || data.description || '',
+        description,
+        desc: description,
         price: Number(data.price) || 0,
-        pack_type: packType,
+        pack_type: productType,
+        delivery_type: deliveryType,
         entry_point: entryPoint,
         approved: false,
         status: 'pending',
         author: data.author || '',
         authorUid: data.authorUid || '',
-        type: 'extension',
-        itemType: 'extension',
+        type: productType,
+        itemType: productType,
         active: false,
-        emoji: '🧩',
-        tag: data.category || 'extension',
+        emoji: productEmoji(productType),
+        tag: data.category || productType,
         createdAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
       };
-      if (packType === 'script') {
+      if (deliveryType === 'script') {
         item.code_body = data.codeBody || '';
+        item.package_url = '';
       } else {
         item.code_body = '';
         item.package_url = data.packageUrl || '';
@@ -971,7 +1020,8 @@
         notify();
         return docRef.id;
       }
-      const id = 'ext_' + Date.now();
+      const idPrefix = productType === 'skin' ? 'skin' : (productType === 'game' ? 'game' : 'ext');
+      const id = `${idPrefix}_${Date.now()}`;
       const mapped = mapToy(id, item);
       cache.toys.push(mapped);
       mergeMarketCache();
@@ -979,9 +1029,18 @@
       notify();
       return id;
     } catch (err) {
-      console.error('[FirebaseStore] addExtensionPack 실패:', err);
+      console.error('[FirebaseStore] addCreatorProduct 실패:', err);
       throw err;
     }
+  }
+
+  async function addExtensionPack(data) {
+    return addCreatorProduct({
+      ...data,
+      productType: data.productType || 'extension',
+      deliveryType: data.deliveryType || (data.packType === 'package' ? 'package' : 'script'),
+      title: data.title || data.name,
+    });
   }
 
   async function updateStoreToyReview(id, { approved, status }) {
@@ -1012,12 +1071,14 @@
     notify();
   }
 
-  async function uploadExtensionPack({
+  async function uploadCreatorProduct({
+    title,
     name,
     category,
     desc,
     price,
-    packType = 'script',
+    productType = 'extension',
+    deliveryType = 'script',
     codeBody = '',
     file,
     packageFile,
@@ -1027,15 +1088,26 @@
   }) {
     if (!uid) {
       const err = new Error('로그인이 필요합니다.');
-      console.error('[FirebaseStore] uploadExtensionPack:', err);
+      console.error('[FirebaseStore] uploadCreatorProduct:', err);
       throw err;
     }
 
-    const normalizedPackType = packType === 'package' ? 'package' : 'script';
+    const normalizedProductType = ['extension', 'skin', 'game'].includes(productType)
+      ? productType
+      : 'extension';
+    const normalizedDeliveryType = deliveryType === 'package' ? 'package' : 'script';
+    const normalizedTitle = String(title || name || '').trim();
     const normalizedEntryPoint = String(entryPoint || 'main.py').trim() || 'main.py';
 
+    if (!normalizedTitle) {
+      throw new Error('상품 이름을 입력해 주세요.');
+    }
+    if (!category) {
+      throw new Error('카테고리를 선택해 주세요.');
+    }
+
     try {
-      if (normalizedPackType === 'package') {
+      if (normalizedDeliveryType === 'package') {
         if (!packageFile) {
           throw new Error('.zip 패키지 파일을 첨부해 주세요.');
         }
@@ -1052,23 +1124,29 @@
         }
 
         const packageUrl = await uploadPackageFile(packageFile, uid);
-        const extensionId = await addExtensionPack({
-          name,
+        const productId = await addCreatorProduct({
+          title: normalizedTitle,
           category,
           desc,
           price,
-          packType: 'package',
+          productType: normalizedProductType,
+          deliveryType: 'package',
           packageUrl,
           entryPoint: normalizedEntryPoint,
           fileName: packageFile.name,
           author,
           authorUid: uid,
         });
-        return { id: extensionId, storageMode: 'package', packType: 'package' };
+        return {
+          id: productId,
+          storageMode: 'package',
+          productType: normalizedProductType,
+          deliveryType: 'package',
+        };
       }
 
       let resolvedCodeBody = String(codeBody || '').trim();
-      let fileName = 'extension.py';
+      let fileName = 'main.py';
 
       if (file) {
         if (!file.name?.toLowerCase().endsWith('.py')) {
@@ -1110,35 +1188,77 @@
       }
 
       const scriptEntryPoint = normalizedEntryPoint || fileName || 'main.py';
-      const extensionId = await addExtensionPack({
-        name,
+      const productId = await addCreatorProduct({
+        title: normalizedTitle,
         category,
         desc,
         price,
-        packType: 'script',
+        productType: normalizedProductType,
+        deliveryType: 'script',
         fileUrl,
         codeBody: resolvedCodeBody,
         fileName,
         entryPoint: scriptEntryPoint,
-        storageMode,
         author,
         authorUid: uid,
       });
 
-      return { id: extensionId, storageMode, packType: 'script' };
+      return {
+        id: productId,
+        storageMode,
+        productType: normalizedProductType,
+        deliveryType: 'script',
+      };
     } catch (err) {
-      console.error('[FirebaseStore] uploadExtensionPack 실패:', err);
+      console.error('[FirebaseStore] uploadCreatorProduct 실패:', err);
       throw err;
     }
   }
 
-  function getExtensionsByUid(uid) {
+  async function uploadExtensionPack({
+    name,
+    title,
+    category,
+    desc,
+    price,
+    productType = 'extension',
+    packType,
+    deliveryType,
+    codeBody = '',
+    file,
+    packageFile,
+    entryPoint = 'main.py',
+    author,
+    uid,
+  }) {
+    const resolvedDelivery = deliveryType || (packType === 'package' ? 'package' : 'script');
+    return uploadCreatorProduct({
+      title: title || name,
+      category,
+      desc,
+      price,
+      productType,
+      deliveryType: resolvedDelivery,
+      codeBody,
+      file,
+      packageFile,
+      entryPoint,
+      author,
+      uid,
+    });
+  }
+
+  function getCreatorProductsByUid(uid) {
     if (!uid) return [];
-    return getExtensionItems().filter((ext) => ext.authorUid === uid);
+    return cache.toys.filter((t) => t.authorUid === uid);
+  }
+
+  function getExtensionsByUid(uid) {
+    return getCreatorProductsByUid(uid).filter((t) => t.type === 'extension');
   }
 
   function getStoreToysByUid(uid) {
-    return getExtensionsByUid(uid);
+    return getCreatorProductsByUid(uid);
   }
 
   async function updateDevSubmission(id, data) {
@@ -1343,6 +1463,7 @@
     getDevSubmissions: () => cache.devSubmissions,
     getExtensions: () => getExtensionItems(),
     getExtensionsByUid,
+    getCreatorProductsByUid,
     getStoreToysByUid,
     getHomeToys: () => cache.homeToys,
     getDevlogs: () => cache.devlogs,
@@ -1368,7 +1489,9 @@
     addDevSubmission,
     updateDevSubmission,
     uploadExtensionPack,
+    uploadCreatorProduct,
     addExtensionPack,
+    addCreatorProduct,
     scanPythonCode,
     scanZipPackage,
     updateStoreToyReview,

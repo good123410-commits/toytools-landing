@@ -1319,17 +1319,28 @@
     openUserModal(userId);
   }
 
-  function getStoreToyExtensions() {
+  function getStoreCreatorProducts() {
     if (FS()?.getToys) {
-      return FS().getToys().filter((t) => t.type === 'extension');
+      return FS().getToys().filter((t) => ['extension', 'skin', 'game'].includes(t.type));
     }
-    return getMarketItems().filter((t) => t.type === 'extension');
+    return getMarketItems().filter((t) => ['extension', 'skin', 'game'].includes(t.type));
+  }
+
+  function getStoreToyExtensions() {
+    return getStoreCreatorProducts();
   }
 
   // ── Developers & Payouts ──
   function renderDevelopers(el) {
-    const extensions = getStoreToyExtensions();
+    const extensions = getStoreCreatorProducts();
     const pendingExtensions = extensions.filter((t) => t.status === 'pending' || (t.approved !== true && t.status !== 'rejected'));
+
+    const PRODUCT_TYPE_LABELS = { extension: '확장팩', skin: '스킨팩', game: '미니게임' };
+    const CATEGORY_LABELS = {
+      productivity: '생산성', data: '데이터', media: '미디어', utility: '유틸리티', automation: '자동화',
+      dark_light: '다크/라이트', neon_cyberpunk: '네온/사이버펑크', minimal: '미니멀', retro: '레트로',
+      arcade: '아케이드', puzzle: '퍼즐', casual: '캐주얼',
+    };
     const payouts = getPayouts().filter((p) => payoutFilter === 'all' || p.status === payoutFilter);
 
     el.innerHTML = `
@@ -1338,19 +1349,21 @@
         <p class="sadmin-page-desc">store_toys 확장팩 검수 및 코인 정산 처리 (실시간)</p>
       </div>
       <div class="sadmin-card">
-        <h3 class="sadmin-card-title"><i data-lucide="puzzle" class="w-4 h-4"></i> 확장팩 검수 (store_toys)</h3>
+        <h3 class="sadmin-card-title"><i data-lucide="puzzle" class="w-4 h-4"></i> 크리에이터 상품 검수 (store_toys)</h3>
         <div class="sadmin-table-wrap">
           <table class="sadmin-table">
-            <thead><tr><th>이름</th><th>유형</th><th>카테고리</th><th>가격</th><th>등록자</th><th>상태</th><th>관리</th></tr></thead>
+            <thead><tr><th>이름</th><th>상품 유형</th><th>카테고리</th><th>가격</th><th>등록자</th><th>상태</th><th>관리</th></tr></thead>
             <tbody>
               ${extensions.length ? extensions.map((ext) => {
-                const packType = ext.pack_type || (ext.package_url ? 'package' : 'script');
-                const packLabel = packType === 'package' ? '패키지' : '스크립트';
+                const productType = ext.pack_type || ext.type || 'extension';
+                const productLabel = PRODUCT_TYPE_LABELS[productType] || productType;
+                const categoryLabel = CATEGORY_LABELS[ext.category] || ext.category || '-';
+                const deliveryType = ext.delivery_type || (ext.package_url ? 'package' : 'script');
                 return `
                 <tr>
-                  <td><strong>${B.escapeHtml(ext.name)}</strong><br><span class="text-xs text-gray-500">${B.escapeHtml((ext.description || ext.desc || '').slice(0, 50))}</span><br><span class="text-xs text-gray-600">진입점: ${B.escapeHtml(ext.entry_point || 'main.py')}</span></td>
-                  <td><span class="dev-pack-badge${packType === 'package' ? ' dev-pack-badge--package' : ''}">${packLabel}</span></td>
-                  <td>${B.escapeHtml(ext.category || '-')}</td>
+                  <td><strong>${B.escapeHtml(ext.title || ext.name)}</strong><br><span class="text-xs text-gray-500">${B.escapeHtml((ext.description || ext.desc || '').slice(0, 50))}</span><br><span class="text-xs text-gray-600">진입점: ${B.escapeHtml(ext.entry_point || 'main.py')} · ${deliveryType === 'package' ? 'ZIP' : '스크립트'}</span></td>
+                  <td><span class="dev-pack-badge${productType === 'skin' ? ' dev-pack-badge--package' : ''}">${productLabel}</span></td>
+                  <td>${B.escapeHtml(categoryLabel)}</td>
                   <td>${(ext.price || 0).toLocaleString()}P</td>
                   <td>${B.escapeHtml(ext.author || ext.creator || '-')}</td>
                   <td><span class="sadmin-status sadmin-status-${ext.status || 'pending'}">${statusLabel(ext.status || 'pending')}</span></td>
@@ -1360,12 +1373,12 @@
                         <button type="button" class="sadmin-btn sadmin-btn-primary" data-approve-ext="${B.escapeHtml(ext.id)}">승인</button>
                         <button type="button" class="sadmin-btn" data-reject-ext="${B.escapeHtml(ext.id)}">반려</button>
                       ` : '-'}
-                      ${packType === 'package' && ext.package_url ? `<a href="${B.escapeHtml(ext.package_url)}" target="_blank" rel="noopener" class="sadmin-btn">ZIP</a>` : ''}
+                      ${deliveryType === 'package' && ext.package_url ? `<a href="${B.escapeHtml(ext.package_url)}" target="_blank" rel="noopener" class="sadmin-btn">ZIP</a>` : ''}
                     </div>
                   </td>
                 </tr>
               `;
-              }).join('') : '<tr><td colspan="7" class="sadmin-empty">등록된 확장팩이 없습니다.</td></tr>'}
+              }).join('') : '<tr><td colspan="7" class="sadmin-empty">등록된 상품이 없습니다.</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -1730,7 +1743,18 @@
     getMarketCatalog(type) {
       const map = { skin: 'skin', game: 'game', extension: 'extension', skins: 'skin', games: 'game', extensions: 'extension' };
       const t = map[type] || type;
-      return getMarketItems().filter((i) => i.type === t && i.status === 'approved' && i.active !== false);
+      const approved = (i) => i.status === 'approved' && i.active !== false;
+      if (t === 'skin' && FS()?.getToys) {
+        const official = getMarketItems().filter((i) => i.type === 'skin' && approved(i));
+        const creator = FS().getToys().filter((i) => i.type === 'skin' && approved(i));
+        const seen = new Set();
+        return [...official, ...creator].filter((i) => {
+          if (seen.has(i.id)) return false;
+          seen.add(i.id);
+          return true;
+        });
+      }
+      return getMarketItems().filter((i) => i.type === t && approved(i));
     },
     isNickMuted(nick) {
       return getMuted().includes(nick) || getBlacklist().includes(nick);
