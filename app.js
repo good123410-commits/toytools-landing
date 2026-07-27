@@ -6,14 +6,14 @@
   'use strict';
 
   // ═══════════════════ FIREBASE CONFIG ═══════════════════
-  // firebase-config.js 에서 window.FIREBASE_CONFIG 로 주입하거나 아래 값을 직접 입력하세요.
+  // firebase-config.js 에서 window.FIREBASE_CONFIG 로 주입하거나 아래 기본값을 사용합니다.
   const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
-    apiKey: 'YOUR_API_KEY',
-    authDomain: 'YOUR_PROJECT.firebaseapp.com',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT.appspot.com',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    appId: 'YOUR_APP_ID',
+    apiKey: 'AIzaSyCFrqxHNHe40N1OpHKhOG18dqHxkG4Bb9Y',
+    authDomain: 'toytools-48776.firebaseapp.com',
+    projectId: 'toytools-48776',
+    storageBucket: 'toytools-48776.firebasestorage.app',
+    messagingSenderId: '867065889622',
+    appId: '1:867065889622:web:0ddd88697d8770c4634cf7',
   };
 
   const TOSS_CLIENT_KEY = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq'; // 토스페이먼츠 테스트 키
@@ -186,13 +186,22 @@
 
   // ═══════════════════ FIREBASE ═══════════════════
   function initFirebase() {
-    if (typeof firebase === 'undefined' || FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
-      console.warn('[ToyTools] Firebase 미설정 — 로컬 모드로 동작합니다.');
+    if (typeof firebase === 'undefined') {
+      console.warn('[ToyTools] Firebase SDK 미로드 — 로컬 모드로 동작합니다.');
+      updateAuthUI(null);
+      return;
+    }
+    if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey === 'YOUR_API_KEY') {
+      console.warn('[ToyTools] Firebase apiKey 미설정 — 로컬 모드로 동작합니다.');
       updateAuthUI(null);
       return;
     }
     try {
-      firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+      if (!firebase.apps.length) {
+        firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+      } else {
+        firebaseApp = firebase.app();
+      }
       auth = firebase.auth();
       db = firebase.firestore();
       if (typeof firebase.storage === 'function') {
