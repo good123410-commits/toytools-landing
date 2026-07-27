@@ -1,6 +1,9 @@
 /* ═══════════════════════════════════════════
    ToyTools — Professional Dark Studio UI
+   build: 20260727-auth-header-v4
    ═══════════════════════════════════════════ */
+
+.hidden { display: none !important; }
 
 :root {
   --bg-base: #0B0F19;
@@ -1194,6 +1197,19 @@ body {
   border-color: transparent;
 }
 .auth-btn-ghost:hover { color: var(--text-primary); }
+
+.auth-header-group {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .auth-header-group:not(.hidden) {
+    display: flex;
+  }
+}
 
 .auth-cash-badge {
   display: inline-flex;

@@ -36,9 +36,9 @@
     };
   </script>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="./style.css?v=202607271716" />
 </head>
-<body class="font-sans bg-studio-base text-gray-100 overflow-x-hidden">
+<body class="font-sans bg-studio-base text-gray-100 overflow-x-hidden" data-build="20260727-auth-header-v4">
 
   <div class="scanlines" aria-hidden="true"></div>
 
@@ -69,14 +69,14 @@
         </nav>
 
         <!-- Auth Area (Desktop) -->
-        <div id="auth-guest" class="hidden md:flex items-center gap-2 ml-2">
-          <button id="btn-login" class="auth-btn auth-btn-primary">로그인</button>
+        <div id="auth-guest-group" class="auth-header-group">
+          <button type="button" id="btn-header-login" class="auth-btn auth-btn-primary">로그인</button>
         </div>
-        <div id="auth-user" class="hidden md:flex items-center gap-2 ml-2 text-sm">
+        <div id="auth-user-group" class="auth-header-group hidden text-sm">
           <span class="auth-user-nick font-semibold" id="header-nickname">닉네임</span>
           <span class="auth-cash-badge" id="header-cash">0P</span>
-          <button id="btn-mypage" class="auth-btn auth-btn-outline auth-btn-sm">마이페이지</button>
-          <button id="btn-logout" class="auth-btn auth-btn-ghost auth-btn-sm">로그아웃</button>
+          <button type="button" id="btn-mypage" class="auth-btn auth-btn-outline auth-btn-sm">마이페이지</button>
+          <button type="button" id="btn-logout" class="auth-btn auth-btn-ghost auth-btn-sm">로그아웃</button>
         </div>
 
         <button id="mobile-menu-btn" class="mobile-menu-btn xl:hidden" aria-label="메뉴 열기">
@@ -93,10 +93,10 @@
       <a href="#developer" class="nav-link mobile-nav-item" data-section="developer">개발자센터</a>
       <a href="#resources" class="nav-link mobile-nav-item" data-section="resources">자료실</a>
       <a href="#admin" id="admin-mobile-nav" class="nav-link mobile-nav-item hidden" data-section="admin">슈퍼 관리자</a>
-      <div id="mobile-auth-guest" class="pt-3 border-t border-white/10">
-        <button id="btn-login-mobile" class="auth-btn auth-btn-primary w-full justify-center">로그인</button>
+      <div id="mobile-auth-guest" class="mobile-auth-group pt-3 border-t border-white/10">
+        <button type="button" id="btn-login-mobile" class="auth-btn auth-btn-primary w-full justify-center">로그인</button>
       </div>
-      <div id="mobile-auth-user" class="hidden pt-3 border-t border-white/10 space-y-2">
+      <div id="mobile-auth-user" class="mobile-auth-group hidden pt-3 border-t border-white/10 space-y-2">
         <div class="flex items-center justify-between text-sm font-semibold px-2">
           <span id="mobile-nickname">닉네임</span>
           <span class="auth-cash-badge" id="mobile-cash">0P</span>
@@ -575,57 +575,58 @@
 
   <!-- ═══════════════════ MODALS ═══════════════════ -->
 
-  <!-- Login Modal -->
-  <div id="modal-login" class="modal hidden" role="dialog" aria-modal="true">
+  <!-- Login / Signup Modal (단일 모달 내 전환) v20260727 -->
+  <div id="modal-login" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-content max-w-md">
-      <button class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+      <button type="button" class="modal-close" data-close-modal aria-label="닫기"><i data-lucide="x" class="w-5 h-5"></i></button>
+
       <div id="auth-view-login">
-      <h2 class="text-xl font-semibold text-white mb-6">로그인</h2>
-      <form id="login-form" class="space-y-4">
-        <div>
-          <label class="form-label" for="login-email">이메일</label>
-          <input type="email" id="login-email" class="form-input" placeholder="you@email.com" required />
-        </div>
-        <div>
-          <label class="form-label" for="login-password">비밀번호</label>
-          <input type="password" id="login-password" class="form-input" placeholder="비밀번호" minlength="6" required />
-        </div>
-        <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">로그인</button>
-      </form>
-      <p class="text-center text-sm text-gray-500 mt-4">
-        계정이 없으신가요? <button type="button" id="switch-to-signup" class="link-subtle">회원가입</button>
-      </p>
+        <h2 id="auth-modal-title" class="text-xl font-semibold text-white mb-6">로그인</h2>
+        <form id="login-form" class="space-y-4">
+          <div>
+            <label class="form-label" for="login-email">이메일</label>
+            <input type="email" id="login-email" class="form-input" placeholder="you@email.com" required autocomplete="email" />
+          </div>
+          <div>
+            <label class="form-label" for="login-password">비밀번호</label>
+            <input type="password" id="login-password" class="form-input" placeholder="비밀번호" minlength="6" required autocomplete="current-password" />
+          </div>
+          <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">로그인</button>
+        </form>
+        <p class="text-center text-sm text-gray-500 mt-4">
+          계정이 없으신가요? <button type="button" id="switch-to-signup" class="link-subtle">회원가입</button>
+        </p>
       </div>
 
       <div id="auth-view-signup" class="hidden">
-      <h2 class="text-xl font-semibold text-white mb-6">회원가입</h2>
-      <form id="signup-form" class="space-y-4">
-        <div>
-          <label class="form-label" for="signup-email">이메일</label>
-          <input type="email" id="signup-email" class="form-input" placeholder="you@email.com" required />
-        </div>
-        <div>
-          <label class="form-label" for="signup-nickname">닉네임</label>
-          <input type="text" id="signup-nickname" class="form-input" placeholder="놀이터 닉네임" maxlength="12" required />
-        </div>
-        <div>
-          <label class="form-label" for="signup-password">비밀번호</label>
-          <input type="password" id="signup-password" class="form-input" placeholder="6자 이상" minlength="6" required />
-        </div>
-        <div>
-          <label class="form-label" for="signup-password2">비밀번호 확인</label>
-          <input type="password" id="signup-password2" class="form-input" placeholder="비밀번호 재입력" minlength="6" required />
-        </div>
-        <label class="flex items-start gap-2 text-sm cursor-pointer">
-          <input type="checkbox" id="signup-agree" class="mt-1" required />
-          <span><button type="button" class="link-subtle" data-open-terms>이용약관</button> 및 <button type="button" class="link-subtle" data-open-privacy>개인정보 처리방침</button>에 동의합니다.</span>
-        </label>
-        <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">가입하기</button>
-      </form>
-      <p class="text-center text-sm text-gray-500 mt-4">
-        이미 계정이 있으신가요? <button type="button" id="switch-to-login" class="link-subtle">로그인</button>
-      </p>
+        <h2 class="text-xl font-semibold text-white mb-6">회원가입</h2>
+        <form id="signup-form" class="space-y-4">
+          <div>
+            <label class="form-label" for="signup-email">이메일</label>
+            <input type="email" id="signup-email" class="form-input" placeholder="you@email.com" required autocomplete="email" />
+          </div>
+          <div>
+            <label class="form-label" for="signup-nickname">닉네임</label>
+            <input type="text" id="signup-nickname" class="form-input" placeholder="놀이터 닉네임" maxlength="12" required autocomplete="nickname" />
+          </div>
+          <div>
+            <label class="form-label" for="signup-password">비밀번호</label>
+            <input type="password" id="signup-password" class="form-input" placeholder="6자 이상" minlength="6" required autocomplete="new-password" />
+          </div>
+          <div>
+            <label class="form-label" for="signup-password2">비밀번호 확인</label>
+            <input type="password" id="signup-password2" class="form-input" placeholder="비밀번호 재입력" minlength="6" required autocomplete="new-password" />
+          </div>
+          <label class="flex items-start gap-2 text-sm cursor-pointer">
+            <input type="checkbox" id="signup-agree" class="mt-1" required />
+            <span><button type="button" class="link-subtle" data-open-terms>이용약관</button> 및 <button type="button" class="link-subtle" data-open-privacy>개인정보 처리방침</button>에 동의합니다.</span>
+          </label>
+          <button type="submit" class="toy-btn-3d toy-btn-3d-sm w-full justify-center">가입하기</button>
+        </form>
+        <p class="text-center text-sm text-gray-500 mt-4">
+          이미 계정이 있으신가요? <button type="button" id="switch-to-login" class="link-subtle">로그인</button>
+        </p>
       </div>
     </div>
   </div>
@@ -857,15 +858,15 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
-  <script src="firebase-config.js"></script>
+  <script src="./firebase-config.js?v=202607271716"></script>
 
   <!-- Toss Payments SDK (PG 연동 준비) -->
   <script src="https://js.tosspayments.com/v1/payment"></script>
 
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="firebase-store.js"></script>
-  <script src="app.js"></script>
-  <script src="admin-dashboard.js"></script>
+  <script src="./firebase-store.js?v=202607271716"></script>
+  <script src="./app.js?v=202607271716"></script>
+  <script src="./admin-dashboard.js?v=202607271716"></script>
 </body>
 </html>

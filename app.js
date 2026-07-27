@@ -5,6 +5,30 @@
 (function () {
   'use strict';
 
+  const BUILD = '20260727-auth-header-v4';
+
+  function assertHttpOrigin() {
+    if (window.location.protocol === 'file:') {
+      const msg = 'ToyTools는 file:// 로 열 수 없습니다. VS Code에서 index.html → "Open with Live Server"로 실행하세요.';
+      console.error(msg);
+      const blocker = document.createElement('div');
+      blocker.setAttribute('role', 'alert');
+      blocker.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:2rem;background:#0B0F19;color:#F9FAFB;font-family:system-ui,sans-serif;text-align:center;line-height:1.6';
+      blocker.innerHTML = [
+        '<div style="max-width:32rem">',
+        '<strong style="display:block;font-size:1.25rem;margin-bottom:.75rem">로컬 서버가 필요합니다</strong>',
+        `<p>${msg}</p>`,
+        '<p style="margin-top:1rem;color:#9CA3AF;font-size:.875rem">예: http://127.0.0.1:5500/index.html</p>',
+        '</div>',
+      ].join('');
+      document.body?.appendChild(blocker);
+      throw new Error(msg);
+    }
+  }
+
+  assertHttpOrigin();
+  console.info(`[ToyTools] build ${BUILD}`);
+
   // ═══════════════════ FIREBASE CONFIG ═══════════════════
   // firebase-config.js 에서 window.FIREBASE_CONFIG 로 주입하거나 아래 기본값을 사용합니다.
   const FIREBASE_CONFIG = window.FIREBASE_CONFIG || {
@@ -218,7 +242,35 @@
         } else {
           userProfile = null;
         }
-        updateAuthUI(user);
+
+        const guestGroup = document.getElementById('auth-guest-group');
+        const userGroup = document.getElementById('auth-user-group');
+        const mobileGuest = document.getElementById('mobile-auth-guest');
+        const mobileUser = document.getElementById('mobile-auth-user');
+
+        if (user) {
+          guestGroup?.classList.add('hidden');
+          userGroup?.classList.remove('hidden');
+          mobileGuest?.classList.add('hidden');
+          mobileUser?.classList.remove('hidden');
+
+          const nick = userProfile?.nickname || '유저';
+          const cash = (userProfile?.cash || 0).toLocaleString();
+          const headerNick = document.getElementById('header-nickname');
+          const headerCash = document.getElementById('header-cash');
+          const mobileNick = document.getElementById('mobile-nickname');
+          const mobileCash = document.getElementById('mobile-cash');
+          if (headerNick) headerNick.textContent = nick;
+          if (headerCash) headerCash.textContent = `${cash}P`;
+          if (mobileNick) mobileNick.textContent = nick;
+          if (mobileCash) mobileCash.textContent = `${cash}P`;
+        } else {
+          guestGroup?.classList.remove('hidden');
+          userGroup?.classList.add('hidden');
+          mobileGuest?.classList.remove('hidden');
+          mobileUser?.classList.add('hidden');
+        }
+
         renderToyMarket();
         updateDeveloperDashboard();
       });
@@ -355,19 +407,32 @@
   }
 
   function updateAuthUI(user) {
-    const guestEls = [$('#auth-guest'), $('#mobile-auth-guest')];
-    const userEls = [$('#auth-user'), $('#mobile-auth-user')];
+    const guestGroup = document.getElementById('auth-guest-group');
+    const userGroup = document.getElementById('auth-user-group');
+    const mobileGuest = document.getElementById('mobile-auth-guest');
+    const mobileUser = document.getElementById('mobile-auth-user');
 
-    if (user && userProfile) {
-      guestEls.forEach((el) => el?.classList.add('hidden'));
-      userEls.forEach((el) => el?.classList.remove('hidden'));
-      const nick = userProfile.nickname || '유저';
-      const cash = (userProfile.cash || 0).toLocaleString();
-      ['#header-nickname', '#mobile-nickname'].forEach((s) => { const el = $(s); if (el) el.textContent = nick; });
-      ['#header-cash', '#mobile-cash'].forEach((s) => { const el = $(s); if (el) el.textContent = `${cash}P`; });
+    if (user) {
+      guestGroup?.classList.add('hidden');
+      userGroup?.classList.remove('hidden');
+      mobileGuest?.classList.add('hidden');
+      mobileUser?.classList.remove('hidden');
+
+      const nick = userProfile?.nickname || '유저';
+      const cash = (userProfile?.cash || 0).toLocaleString();
+      const headerNick = document.getElementById('header-nickname');
+      const headerCash = document.getElementById('header-cash');
+      const mobileNick = document.getElementById('mobile-nickname');
+      const mobileCash = document.getElementById('mobile-cash');
+      if (headerNick) headerNick.textContent = nick;
+      if (headerCash) headerCash.textContent = `${cash}P`;
+      if (mobileNick) mobileNick.textContent = nick;
+      if (mobileCash) mobileCash.textContent = `${cash}P`;
     } else {
-      guestEls.forEach((el) => el?.classList.remove('hidden'));
-      userEls.forEach((el) => el?.classList.add('hidden'));
+      guestGroup?.classList.remove('hidden');
+      userGroup?.classList.add('hidden');
+      mobileGuest?.classList.remove('hidden');
+      mobileUser?.classList.add('hidden');
     }
   }
 
@@ -387,7 +452,7 @@
   function bindAuthUI() {
     const openLogin = () => openAuthModal('login');
 
-    $('#btn-login')?.addEventListener('click', openLogin);
+    $('#btn-header-login')?.addEventListener('click', openLogin);
     $('#btn-login-mobile')?.addEventListener('click', openLogin);
     $('#switch-to-signup')?.addEventListener('click', () => showAuthView('signup'));
     $('#switch-to-login')?.addEventListener('click', () => showAuthView('login'));
@@ -906,12 +971,14 @@
       return;
     }
     container.classList.remove('hidden');
-    container.innerHTML = writeAttachments.map((att) => `
+    container.innerHTML = writeAttachments.map((att) => {
+      const safeSrc = isSafeImageSrc(att.dataUrl) ? att.dataUrl.replace(/"/g, '&quot;') : '';
+      return `
       <div class="write-preview-item" data-att-id="${att.id}">
-        <img src="${att.dataUrl}" alt="${escapeHtml(att.name)}" />
+        <img src="${safeSrc}" alt="${escapeHtml(att.name)}" />
         <button type="button" class="write-preview-remove" data-remove-att="${att.id}" aria-label="이미지 삭제">×</button>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
     container.querySelectorAll('[data-remove-att]').forEach((btn) => {
       btn.addEventListener('click', () => removeWriteAttachment(btn.dataset.removeAtt));
     });
@@ -2101,6 +2168,9 @@
   }
 
   function isSafeImageSrc(src) {
+    if (!src || /^file:/i.test(src) || /^[a-zA-Z]:[\\/]/.test(src) || /^\/[a-zA-Z]:/.test(src)) {
+      return false;
+    }
     return /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(src)
       || /^https:\/\/[^\s"'<>]+$/i.test(src);
   }
