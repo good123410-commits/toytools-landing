@@ -1168,6 +1168,20 @@
     if (btn) btn.classList.toggle('hidden', currentBoardId === 'notice');
   }
 
+  function refreshViewingPostComments() {
+    if (boardView !== 'DETAIL' || !viewingPostId) return;
+    const post = posts.find((p) => p.id === viewingPostId);
+    if (post) renderComments(post);
+  }
+
+  function appendCommentToPost(postId, comment) {
+    const post = posts.find((p) => p.id === postId);
+    if (!post) return null;
+    if (!post.comments) post.comments = [];
+    post.comments.push(comment);
+    return post;
+  }
+
   function subscribePosts(boardId) {
     if (postsUnsubscribe) postsUnsubscribe();
     if (!firebaseReady || !db) {
@@ -1187,6 +1201,7 @@
           return tb - ta;
         });
         renderBoard();
+        refreshViewingPostComments();
         if (isAdmin) window.SuperAdmin?.renderPanel();
       }, () => {
         posts = getLocalPosts(boardId);
@@ -1412,26 +1427,34 @@
     $('#comment-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!viewingPostId) return;
-      const nick = $('#comment-nick').value.trim() || '익명';
-      const body = $('#comment-body').value.trim();
+      const nickInput = $('#comment-nick');
+      const bodyInput = $('#comment-body');
+      const nick = nickInput?.value?.trim() || '익명';
+      const body = bodyInput?.value?.trim();
       if (!body) return;
 
       const comment = { nick, body, time: formatDateTime(new Date()) };
+      const postId = viewingPostId;
 
-      if (firebaseReady && db) {
-        const ref = db.collection('posts').doc(viewingPostId);
-        await ref.update({ comments: firebase.firestore.FieldValue.arrayUnion(comment) });
-      } else {
-        const post = posts.find((p) => p.id === viewingPostId);
-        if (post) {
-          if (!post.comments) post.comments = [];
-          post.comments.push(comment);
-          saveLocalPosts();
-          renderComments(post);
+      try {
+        if (firebaseReady && db) {
+          const ref = db.collection('posts').doc(postId);
+          await ref.update({ comments: firebase.firestore.FieldValue.arrayUnion(comment) });
+          const post = appendCommentToPost(postId, comment);
+          if (post) renderComments(post);
+        } else {
+          const post = appendCommentToPost(postId, comment);
+          if (post) {
+            saveLocalPosts();
+            renderComments(post);
+          }
         }
+        if (bodyInput) bodyInput.value = '';
+        showToast('댓글이 등록되었습니다!');
+      } catch (err) {
+        console.error('[ToyTools] 댓글 등록 실패:', err);
+        showToast('댓글 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.');
       }
-      $('#comment-body').value = '';
-      showToast('댓글이 등록되었습니다!');
     });
   }
 
@@ -1592,8 +1615,9 @@
     } else {
       post.comments = comments;
       saveLocalPosts();
-      renderComments(post);
     }
+    renderComments(post);
+    renderBoard();
     showToast('댓글이 삭제되었습니다.');
   }
 
