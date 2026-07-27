@@ -436,7 +436,7 @@
                 </td>
                 <td>
                   <div class="sadmin-actions">
-                    ${item.status === 'pending' ? `
+                    ${canReviewMarketItem(item) ? `
                       <button type="button" class="sadmin-btn sadmin-btn-primary" data-approve="${item.id}">승인</button>
                       <button type="button" class="sadmin-btn" data-reject="${item.id}">반려</button>
                     ` : ''}
@@ -490,10 +490,14 @@
         message: '이 마켓 아이템을 영구 삭제합니다. 계속하시겠습니까?',
         danger: true,
         onConfirm: async () => {
-          if (FS()) await FS().deleteMarketItem(btn.dataset.delItem);
-          else await saveMarketItems(getMarketItems().filter((i) => i.id !== btn.dataset.delItem));
-          B.showToast('아이템이 삭제되었습니다.');
-          renderMarketplace(el);
+          try {
+            await removeMarketItem(btn.dataset.delItem);
+            B.showToast('아이템이 삭제되었습니다.');
+            renderPanel();
+          } catch (err) {
+            console.error('[SuperAdmin] 아이템 삭제 실패:', err);
+            B.showToast(err.message || '삭제에 실패했습니다.');
+          }
         },
       }));
     });
@@ -506,22 +510,64 @@
     return { pending: '대기중', approved: '승인됨', rejected: '반려됨' }[s] || s;
   }
 
-  async function updateMarketStatus(id, status) {
+  function isStoreToyItem(item) {
+    return item && item.type !== 'skin' && item._collection !== 'store_skins';
+  }
+
+  function canReviewMarketItem(item) {
+    if (!item) return false;
+    if (item.status === 'approved' || item.status === 'rejected') return false;
+    return item.status === 'pending' || item.approved !== true;
+  }
+
+  async function reviewMarketItem(id, status) {
+    if (B.adminReviewStoreToy) {
+      await B.adminReviewStoreToy(id, status);
+      return;
+    }
     const items = getMarketItems();
     const item = items.find((i) => i.id === id);
-    if (!item) return;
+    if (!item) throw new Error('항목을 찾을 수 없습니다.');
     const approved = status === 'approved';
-    if (FS()?.updateStoreToyReview) {
+    if (isStoreToyItem(item) && FS()?.updateStoreToyReview) {
       await FS().updateStoreToyReview(id, { approved, status });
+    } else if (FS()?.upsertMarketItem) {
+      item.status = status;
+      item.approved = approved;
+      if (approved) item.active = true;
+      await FS().upsertMarketItem(item);
     } else {
       item.status = status;
       item.approved = approved;
       if (approved) item.active = true;
-      if (FS()) await FS().upsertMarketItem(item);
-      else await saveMarketItems(items);
+      await saveMarketItems(items);
     }
-    B.showToast(status === 'approved' ? '승인되었습니다.' : '반려되었습니다.');
-    renderPanel();
+  }
+
+  async function removeMarketItem(id) {
+    if (B.adminDeleteStoreToy) {
+      await B.adminDeleteStoreToy(id);
+      return;
+    }
+    const item = getMarketItems().find((i) => i.id === id);
+    if (isStoreToyItem(item) && FS()?.deleteStoreToy) {
+      await FS().deleteStoreToy(id);
+    } else if (FS()) {
+      await FS().deleteMarketItem(id);
+    } else {
+      await saveMarketItems(getMarketItems().filter((i) => i.id !== id));
+    }
+  }
+
+  async function updateMarketStatus(id, status) {
+    try {
+      await reviewMarketItem(id, status);
+      B.showToast(status === 'approved' ? '승인되었습니다.' : '반려되었습니다.');
+      renderPanel();
+    } catch (err) {
+      console.error('[SuperAdmin] 검수 처리 실패:', err);
+      B.showToast(err.message || '처리에 실패했습니다.');
+    }
   }
 
   function openItemEdit(id) {
@@ -1295,11 +1341,15 @@
         <h3 class="sadmin-card-title"><i data-lucide="puzzle" class="w-4 h-4"></i> 확장팩 검수 (store_toys)</h3>
         <div class="sadmin-table-wrap">
           <table class="sadmin-table">
-            <thead><tr><th>이름</th><th>카테고리</th><th>가격</th><th>등록자</th><th>상태</th><th>관리</th></tr></thead>
+            <thead><tr><th>이름</th><th>유형</th><th>카테고리</th><th>가격</th><th>등록자</th><th>상태</th><th>관리</th></tr></thead>
             <tbody>
-              ${extensions.length ? extensions.map((ext) => `
+              ${extensions.length ? extensions.map((ext) => {
+                const packType = ext.pack_type || (ext.package_url ? 'package' : 'script');
+                const packLabel = packType === 'package' ? '패키지' : '스크립트';
+                return `
                 <tr>
-                  <td><strong>${B.escapeHtml(ext.name)}</strong><br><span class="text-xs text-gray-500">${B.escapeHtml((ext.description || ext.desc || '').slice(0, 50))}</span></td>
+                  <td><strong>${B.escapeHtml(ext.name)}</strong><br><span class="text-xs text-gray-500">${B.escapeHtml((ext.description || ext.desc || '').slice(0, 50))}</span><br><span class="text-xs text-gray-600">진입점: ${B.escapeHtml(ext.entry_point || 'main.py')}</span></td>
+                  <td><span class="dev-pack-badge${packType === 'package' ? ' dev-pack-badge--package' : ''}">${packLabel}</span></td>
                   <td>${B.escapeHtml(ext.category || '-')}</td>
                   <td>${(ext.price || 0).toLocaleString()}P</td>
                   <td>${B.escapeHtml(ext.author || ext.creator || '-')}</td>
@@ -1310,10 +1360,12 @@
                         <button type="button" class="sadmin-btn sadmin-btn-primary" data-approve-ext="${B.escapeHtml(ext.id)}">승인</button>
                         <button type="button" class="sadmin-btn" data-reject-ext="${B.escapeHtml(ext.id)}">반려</button>
                       ` : '-'}
+                      ${packType === 'package' && ext.package_url ? `<a href="${B.escapeHtml(ext.package_url)}" target="_blank" rel="noopener" class="sadmin-btn">ZIP</a>` : ''}
                     </div>
                   </td>
                 </tr>
-              `).join('') : '<tr><td colspan="6" class="sadmin-empty">등록된 확장팩이 없습니다.</td></tr>'}
+              `;
+              }).join('') : '<tr><td colspan="7" class="sadmin-empty">등록된 확장팩이 없습니다.</td></tr>'}
             </tbody>
           </table>
         </div>

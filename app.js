@@ -345,6 +345,26 @@
     return fallback.find((i) => i.id === itemId);
   }
 
+  async function adminReviewStoreToy(id, status) {
+    const FS = window.FirebaseStore;
+    if (!FS?.updateStoreToyReview) throw new Error('Firebase가 연결되지 않았습니다.');
+    const approved = status === 'approved';
+    await FS.updateStoreToyReview(id, { approved, status });
+  }
+
+  async function adminDeleteStoreToy(id) {
+    const FS = window.FirebaseStore;
+    if (!FS) throw new Error('Firebase가 연결되지 않았습니다.');
+    const item = FS.getMarket?.()?.find((i) => i.id === id);
+    if (item?.type === 'skin') {
+      await FS.deleteMarketItem(id);
+    } else if (FS.deleteStoreToy) {
+      await FS.deleteStoreToy(id);
+    } else {
+      await FS.deleteMarketItem(id);
+    }
+  }
+
   async function setupDataStore() {
     if (typeof window.FirebaseStore === 'undefined') return;
     await window.FirebaseStore.init(getBridge());
@@ -374,6 +394,8 @@
       adminDeleteBoard,
       adminDeletePost,
       adminDeletePostsByNick,
+      adminReviewStoreToy,
+      adminDeleteStoreToy,
       renderToyMarket,
       renderResources,
       renderDevLogs,
@@ -1077,6 +1099,15 @@
       reader.onload = () => resolve(reader.result);
       reader.onerror = reject;
       reader.readAsDataURL(file);
+    });
+  }
+
+  function readFileAsText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ''));
+      reader.onerror = reject;
+      reader.readAsText(file, 'UTF-8');
     });
   }
 
@@ -2250,6 +2281,36 @@ def run(context):
 `;
 
   let devUploading = false;
+  let devPackType = 'script';
+
+  function getDevPackType() {
+    const checked = document.querySelector('input[name="dev-pack-type"]:checked');
+    return checked?.value === 'package' ? 'package' : 'script';
+  }
+
+  function setDevPackType(type) {
+    devPackType = type === 'package' ? 'package' : 'script';
+    const scriptPanel = $('#dev-panel-script');
+    const packagePanel = $('#dev-panel-package');
+    scriptPanel?.classList.toggle('hidden', devPackType !== 'script');
+    packagePanel?.classList.toggle('hidden', devPackType !== 'package');
+    hideDevScanWarning();
+    lucide.createIcons();
+  }
+
+  function showDevScanWarning(message) {
+    const el = $('#dev-scan-warning');
+    if (!el) return;
+    el.innerHTML = `<strong>보안 검사 실패</strong><br>${escapeHtml(message)}`;
+    el.classList.remove('hidden');
+  }
+
+  function hideDevScanWarning() {
+    const el = $('#dev-scan-warning');
+    if (!el) return;
+    el.textContent = '';
+    el.classList.add('hidden');
+  }
 
   function setDevSubmitLoading(loading) {
     const btn = $('#dev-submit-btn');
@@ -2274,6 +2335,33 @@ def run(context):
       fileNameEl.classList.add('hidden');
     }
     dropZone?.classList.remove('has-file');
+  }
+
+  function resetDevZipInput() {
+    const zipInput = $('#dev-item-zip');
+    const zipNameEl = $('#dev-zip-name');
+    const zipDrop = $('#dev-zip-drop');
+    if (zipInput) zipInput.value = '';
+    if (zipNameEl) {
+      zipNameEl.textContent = '';
+      zipNameEl.classList.add('hidden');
+    }
+    zipDrop?.classList.remove('has-file');
+  }
+
+  function resetDevUploadForm() {
+    resetDevFileInput();
+    resetDevZipInput();
+    const codeBody = $('#dev-code-body');
+    if (codeBody) codeBody.value = '';
+    const scriptEntry = $('#dev-script-entry-point');
+    const packageEntry = $('#dev-package-entry-point');
+    if (scriptEntry) scriptEntry.value = 'main.py';
+    if (packageEntry) packageEntry.value = 'main.py';
+    hideDevScanWarning();
+    setDevPackType('script');
+    const scriptRadio = document.querySelector('input[name="dev-pack-type"][value="script"]');
+    if (scriptRadio) scriptRadio.checked = true;
   }
 
   function getMyExtensions() {
@@ -2334,6 +2422,10 @@ def run(context):
         ? 'dev-ext-status--approved'
         : (status === 'rejected' ? 'dev-ext-status--rejected' : 'dev-ext-status--pending');
       const statusText = status === 'approved' ? '승인 완료' : (status === 'rejected' ? '반려됨' : '승인 대기');
+      const packType = ext.pack_type || (ext.package_url ? 'package' : 'script');
+      const packLabel = packType === 'package' ? '패키지 (.zip)' : '스크립트 (.py)';
+      const packBadgeClass = packType === 'package' ? 'dev-pack-badge dev-pack-badge--package' : 'dev-pack-badge';
+      const entryPoint = ext.entry_point || 'main.py';
       const cat = DEV_CATEGORY_LABELS[ext.category] || ext.category || '-';
       const price = Number(ext.price) || 0;
       const dateStr = ext.createdAt ? toDisplayDate(ext.createdAt) : '';
@@ -2346,8 +2438,10 @@ def run(context):
           </div>
           <p class="dev-ext-item-desc">${escapeHtml(descText)}</p>
           <div class="dev-ext-item-meta">
+            <span class="${packBadgeClass}">${escapeHtml(packLabel)}</span>
             <span>${escapeHtml(cat)}</span>
             <span>${price.toLocaleString()} DP</span>
+            <span>진입점: ${escapeHtml(entryPoint)}</span>
             ${dateStr ? `<span>${escapeHtml(dateStr)}</span>` : ''}
           </div>
         </article>
@@ -2355,10 +2449,47 @@ def run(context):
     }).join('');
   }
 
+  function bindDevFileDrop(dropZone, fileInput, setFile, acceptZip = false) {
+    dropZone?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) setFile(file);
+    });
+
+    if (!dropZone) return;
+
+    ['dragenter', 'dragover'].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (evt === 'drop' && e.dataTransfer?.files?.length) {
+          setFile(e.dataTransfer.files[0]);
+        }
+        dropZone.classList.remove('drag-over');
+      });
+    });
+  }
+
   function bindDeveloperCenter() {
     const fileInput = $('#dev-item-file');
     const dropZone = $('#dev-file-drop');
     const fileNameEl = $('#dev-file-name');
+    const zipInput = $('#dev-item-zip');
+    const zipDrop = $('#dev-zip-drop');
+    const zipNameEl = $('#dev-zip-name');
+    const codeBodyEl = $('#dev-code-body');
+
+    $$('input[name="dev-pack-type"]').forEach((radio) => {
+      radio.addEventListener('change', () => setDevPackType(radio.value));
+    });
+    setDevPackType(getDevPackType());
 
     function setDevFile(file) {
       if (!file) return;
@@ -2378,37 +2509,44 @@ def run(context):
         fileNameEl.classList.remove('hidden');
       }
       dropZone?.classList.add('has-file');
+      const scriptEntry = $('#dev-script-entry-point');
+      if (scriptEntry && !scriptEntry.value.trim()) {
+        scriptEntry.value = file.name;
+      }
+      readFileAsText(file).then((text) => {
+        if (codeBodyEl && !codeBodyEl.value.trim()) {
+          codeBodyEl.value = text;
+        }
+      }).catch(() => { /* ignore */ });
     }
 
-    dropZone?.addEventListener('click', () => fileInput?.click());
-    fileInput?.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (file) setDevFile(file);
-    });
-
-    if (dropZone) {
-      ['dragenter', 'dragover'].forEach((evt) => {
-        dropZone.addEventListener(evt, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          dropZone.classList.add('drag-over');
-        });
-      });
-      ['dragleave', 'drop'].forEach((evt) => {
-        dropZone.addEventListener(evt, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (evt === 'drop' && e.dataTransfer?.files?.length) {
-            setDevFile(e.dataTransfer.files[0]);
-          }
-          dropZone.classList.remove('drag-over');
-        });
-      });
+    function setDevZip(file) {
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.zip')) {
+        showToast('.zip 패키지 파일만 업로드할 수 있습니다.');
+        return;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        showToast('패키지 파일은 50MB 이하여야 합니다.');
+        return;
+      }
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      if (zipInput) zipInput.files = dt.files;
+      if (zipNameEl) {
+        zipNameEl.textContent = file.name;
+        zipNameEl.classList.remove('hidden');
+      }
+      zipDrop?.classList.add('has-file');
     }
+
+    bindDevFileDrop(dropZone, fileInput, setDevFile);
+    bindDevFileDrop(zipDrop, zipInput, setDevZip, true);
 
     $('#dev-submit-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (devUploading) return;
+      hideDevScanWarning();
 
       if (!currentUser) {
         showToast('로그인 후 확장팩 업로드가 가능합니다.');
@@ -2421,7 +2559,13 @@ def run(context):
       const category = $('#dev-item-category')?.value;
       const desc = $('#dev-item-desc')?.value?.trim();
       const price = Number($('#dev-item-price')?.value);
+      const packType = getDevPackType();
+      const codeBody = $('#dev-code-body')?.value || '';
       const file = fileInput?.files?.[0];
+      const packageFile = zipInput?.files?.[0];
+      const entryPoint = packType === 'package'
+        ? ($('#dev-package-entry-point')?.value?.trim() || 'main.py')
+        : ($('#dev-script-entry-point')?.value?.trim() || file?.name || 'main.py');
 
       if (!name || !category || !desc) {
         showToast('필수 항목을 모두 입력해 주세요.');
@@ -2431,12 +2575,14 @@ def run(context):
         showToast('가격(DP)을 올바르게 입력해 주세요.');
         return;
       }
-      if (!file) {
-        showToast('.py 스크립트 파일을 첨부해 주세요.');
-        return;
-      }
-      if (!file.name.toLowerCase().endsWith('.py')) {
-        showToast('.py 파일만 업로드할 수 있습니다.');
+
+      if (packType === 'script') {
+        if (!codeBody.trim() && !file) {
+          showToast('파이썬 코드를 입력하거나 .py 파일을 첨부해 주세요.');
+          return;
+        }
+      } else if (!packageFile) {
+        showToast('.zip 패키지 파일을 첨부해 주세요.');
         return;
       }
 
@@ -2455,18 +2601,29 @@ def run(context):
           category,
           desc,
           price,
-          file,
+          packType,
+          codeBody,
+          file: packType === 'script' ? file : null,
+          packageFile: packType === 'package' ? packageFile : null,
+          entryPoint,
           author,
           uid: currentUser.uid,
         });
 
-        showToast('확장팩 업로드가 완료되었습니다! (승인 대기중)');
+        const successMsg = packType === 'package'
+          ? '확장팩 패키지 업로드가 완료되었습니다! (승인 대기중)'
+          : '확장팩 업로드가 완료되었습니다! (승인 대기중)';
+        showToast(successMsg);
         form.reset();
-        resetDevFileInput();
+        resetDevUploadForm();
         updateDeveloperDashboard();
       } catch (err) {
         console.error('[ToyTools] 확장팩 업로드 실패:', err);
-        showToast(err.message || '업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+        const msg = err.message || '업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+        if (/보안 검사|위험 키워드/i.test(msg)) {
+          showDevScanWarning(msg);
+        }
+        showToast(msg);
       } finally {
         devUploading = false;
         setDevSubmitLoading(false);

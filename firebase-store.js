@@ -124,8 +124,71 @@
     const raw = String(pick(data, 'type', 'itemType', 'toyType') || '').toLowerCase();
     if (raw.includes('extension') || raw.includes('확장')) return 'extension';
     if (raw.includes('game') || raw.includes('mini') || raw.includes('미니')) return 'game';
-    if (pick(data, 'code_body', 'codeBody')) return 'extension';
+    if (pick(data, 'code_body', 'codeBody', 'package_url', 'packageUrl')) return 'extension';
     return 'game';
+  }
+
+  const DANGEROUS_CODE_PATTERNS = [
+    { pattern: /\bos\.system\s*\(/, label: 'os.system' },
+    { pattern: /\bos\.popen\s*\(/, label: 'os.popen' },
+    { pattern: /\bos\.remove\s*\(/, label: 'os.remove' },
+    { pattern: /\bos\.unlink\s*\(/, label: 'os.unlink' },
+    { pattern: /\bos\.rmdir\s*\(/, label: 'os.rmdir' },
+    { pattern: /\bshutil\.rmtree\s*\(/, label: 'shutil.rmtree' },
+    { pattern: /\bsubprocess\.(call|Popen|run|check_output|check_call)\s*\(/, label: 'subprocess 실행' },
+    { pattern: /\bwinreg\./, label: 'winreg (레지스트리 수정)' },
+    { pattern: /\bctypes\.windll\b/, label: 'ctypes.windll' },
+    { pattern: /\beval\s*\(/, label: 'eval()' },
+    { pattern: /\bexec\s*\(/, label: 'exec()' },
+    { pattern: /\b__import__\s*\(/, label: '__import__()' },
+    { pattern: /\bpickle\.loads?\s*\(/, label: 'pickle 역직렬화' },
+    { pattern: /\bsocket\.(socket|create_connection)\s*\(/, label: 'socket 연결' },
+    { pattern: /\brequests\.(get|post|put|delete|request)\s*\(/, label: '외부 HTTP 요청' },
+  ];
+
+  function scanPythonCode(code) {
+    const source = String(code || '');
+    if (!source.trim()) {
+      return { safe: false, matches: ['코드가 비어 있습니다.'] };
+    }
+    const matches = [];
+    DANGEROUS_CODE_PATTERNS.forEach(({ pattern, label }) => {
+      if (pattern.test(source)) matches.push(label);
+    });
+    return { safe: matches.length === 0, matches };
+  }
+
+  function buildSecurityScanError(matches) {
+    const list = (matches || []).slice(0, 8).join(', ');
+    const extra = (matches || []).length > 8 ? ' 외 추가 항목' : '';
+    return new Error(`보안 검사에 실패했습니다. 위험 키워드가 감지되어 업로드가 차단되었습니다: ${list}${extra}`);
+  }
+
+  async function scanZipPackage(file) {
+    if (!file?.name?.toLowerCase().endsWith('.zip')) {
+      throw new Error('.zip 패키지 파일만 업로드할 수 있습니다.');
+    }
+    if (typeof JSZip === 'undefined') {
+      throw new Error('ZIP 검사 모듈을 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
+    }
+    const zip = await JSZip.loadAsync(file);
+    const pyEntries = Object.keys(zip.files).filter((name) => {
+      const entry = zip.files[name];
+      return entry && !entry.dir && name.toLowerCase().endsWith('.py');
+    });
+    if (!pyEntries.length) {
+      return { safe: true, matches: [], scannedFiles: 0 };
+    }
+    const allMatches = new Set();
+    for (const name of pyEntries) {
+      const content = await zip.files[name].async('string');
+      const result = scanPythonCode(content);
+      if (!result.safe) {
+        result.matches.forEach((m) => allMatches.add(`${name}: ${m}`));
+      }
+    }
+    const matches = [...allMatches];
+    return { safe: matches.length === 0, matches, scannedFiles: pyEntries.length };
   }
 
   function mapSkin(id, data) {
@@ -170,7 +233,10 @@
       active: data.active !== false && data.enabled !== false && data.isActive !== false,
       author: pick(data, 'author', 'creator', 'createdBy') || 'ToyTools',
       authorUid: pick(data, 'authorUid', 'authorId', 'uid') || '',
+      pack_type: pick(data, 'pack_type', 'packType') || (pick(data, 'package_url', 'packageUrl') ? 'package' : 'script'),
       code_body: pick(data, 'code_body', 'codeBody', 'content') || '',
+      package_url: pick(data, 'package_url', 'packageUrl', 'download_url', 'downloadUrl') || '',
+      entry_point: pick(data, 'entry_point', 'entryPoint') || 'main.py',
       fileUrl: pick(data, 'fileUrl', 'downloadUrl', 'url') || '',
       fileName: pick(data, 'fileName', 'filename') || '',
       creator: pick(data, 'creator', 'author', 'createdBy') || 'ToyTools',
@@ -308,7 +374,10 @@
       active: item.active !== false,
       author: item.author || item.creator || raw.author || 'ToyTools',
       authorUid: item.authorUid || raw.authorUid || '',
+      pack_type: item.pack_type || raw.pack_type || (item.package_url || raw.package_url ? 'package' : 'script'),
       code_body: item.code_body || raw.code_body || '',
+      package_url: item.package_url || raw.package_url || '',
+      entry_point: item.entry_point || raw.entry_point || 'main.py',
       fileUrl: item.fileUrl || raw.fileUrl || '',
       fileName: item.fileName || raw.fileName || '',
       creator: item.creator || item.author || 'ToyTools',
@@ -653,8 +722,19 @@
     cache.skins = cache.skins.filter((i) => i.id !== id);
     cache.toys = cache.toys.filter((i) => i.id !== id);
     mergeMarketCache();
-    if (ready && db) {
-      await db.collection(collection).doc(id).delete();
+    if (canWriteFirestore()) {
+      await getFirestore().collection(collection).doc(id).delete();
+    } else {
+      lsSave(LS.market, cache.market);
+    }
+    notify();
+  }
+
+  async function deleteStoreToy(id) {
+    cache.toys = cache.toys.filter((t) => t.id !== id);
+    mergeMarketCache();
+    if (canWriteFirestore()) {
+      await getFirestore().collection(COL.toys).doc(id).delete();
     } else {
       lsSave(LS.market, cache.market);
     }
@@ -738,7 +818,10 @@
 
   const UPLOAD_TIMEOUT_MS = 120000;
   const EXTENSION_STORAGE_TIMEOUT_MS = 6000;
+  const PACKAGE_STORAGE_TIMEOUT_MS = 120000;
   const EXT_STORAGE_SKIP_KEY = 'toytools_skip_ext_storage';
+  const MAX_SCRIPT_BYTES = 5 * 1024 * 1024;
+  const MAX_PACKAGE_BYTES = 50 * 1024 * 1024;
 
   function shouldTryExtensionStorage() {
     try {
@@ -783,6 +866,37 @@
     });
   }
 
+  async function uploadPackageFile(file, uid) {
+    const storage = bridge?.getStorage?.();
+    if (!storage) {
+      throw new Error('패키지 업로드를 위해 Firebase Storage 설정이 필요합니다.');
+    }
+    if (!file?.name?.toLowerCase().endsWith('.zip')) {
+      throw new Error('.zip 패키지 파일만 업로드할 수 있습니다.');
+    }
+    if (file.size > MAX_PACKAGE_BYTES) {
+      throw new Error('패키지 파일은 50MB 이하여야 합니다.');
+    }
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `extension_packages/${uid}/${Date.now()}_${safeName}`;
+    const ref = storage.ref(path);
+    try {
+      const uploadTask = ref.put(file, {
+        contentType: 'application/zip',
+        customMetadata: { uploadedBy: uid, packType: 'package' },
+      });
+      const snapshot = await withTimeout(
+        uploadTask,
+        PACKAGE_STORAGE_TIMEOUT_MS,
+        '패키지 Storage 업로드 시간 초과'
+      );
+      return await snapshot.ref.getDownloadURL();
+    } catch (err) {
+      console.error('[FirebaseStore] uploadPackageFile 실패:', path, err);
+      throw new Error(err.message || '패키지 업로드에 실패했습니다.');
+    }
+  }
+
   async function uploadExtensionFile(file, uid) {
     if (!shouldTryExtensionStorage()) {
       return null;
@@ -820,12 +934,15 @@
 
   async function addExtensionPack(data) {
     try {
+      const packType = data.packType === 'package' ? 'package' : 'script';
+      const entryPoint = (data.entryPoint || 'main.py').trim() || 'main.py';
       const item = {
         name: data.name || '',
         category: data.category || '',
         description: data.desc || data.description || '',
         price: Number(data.price) || 0,
-        code_body: data.codeBody || '',
+        pack_type: packType,
+        entry_point: entryPoint,
         approved: false,
         status: 'pending',
         author: data.author || '',
@@ -837,6 +954,12 @@
         tag: data.category || 'extension',
         createdAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
       };
+      if (packType === 'script') {
+        item.code_body = data.codeBody || '';
+      } else {
+        item.code_body = '';
+        item.package_url = data.packageUrl || '';
+      }
       if (data.fileUrl) item.fileUrl = data.fileUrl;
       if (data.fileName) item.fileName = data.fileName;
 
@@ -873,8 +996,14 @@
     if (idx >= 0) {
       const merged = { ...cache.toys[idx]._raw, ...cache.toys[idx], ...patch };
       cache.toys[idx] = mapToy(id, merged);
-      mergeMarketCache();
+    } else {
+      const marketItem = cache.market.find((m) => m.id === id && m.type !== 'skin');
+      if (marketItem) {
+        const merged = { ...marketItem._raw, ...marketItem, ...patch };
+        cache.toys.push(mapToy(id, merged));
+      }
     }
+    mergeMarketCache();
     if (canWriteFirestore()) {
       await getFirestore().collection(COL.toys).doc(id).update(patch);
     } else {
@@ -883,35 +1012,96 @@
     notify();
   }
 
-  async function uploadExtensionPack({ name, category, desc, price, file, author, uid }) {
+  async function uploadExtensionPack({
+    name,
+    category,
+    desc,
+    price,
+    packType = 'script',
+    codeBody = '',
+    file,
+    packageFile,
+    entryPoint = 'main.py',
+    author,
+    uid,
+  }) {
     if (!uid) {
       const err = new Error('로그인이 필요합니다.');
       console.error('[FirebaseStore] uploadExtensionPack:', err);
       throw err;
     }
-    if (!file) {
-      throw new Error('.py 스크립트 파일을 첨부해 주세요.');
-    }
+
+    const normalizedPackType = packType === 'package' ? 'package' : 'script';
+    const normalizedEntryPoint = String(entryPoint || 'main.py').trim() || 'main.py';
+
     try {
-      const fileName = file.name || 'extension.py';
+      if (normalizedPackType === 'package') {
+        if (!packageFile) {
+          throw new Error('.zip 패키지 파일을 첨부해 주세요.');
+        }
+        if (!packageFile.name?.toLowerCase().endsWith('.zip')) {
+          throw new Error('.zip 패키지 파일만 업로드할 수 있습니다.');
+        }
+        if (packageFile.size > MAX_PACKAGE_BYTES) {
+          throw new Error('패키지 파일은 50MB 이하여야 합니다.');
+        }
 
-      // 1) 파일 내용을 먼저 읽어 Storage 실패 시에도 즉시 저장 가능하게 함
-      const codeBody = await readFileAsText(file);
-      if (!codeBody.trim()) {
-        throw new Error('파일 내용이 비어 있습니다.');
-      }
-      if (codeBody.length > 900000) {
-        throw new Error('파일이 너무 큽니다(약 900KB 이하). Storage 설정 후 다시 시도해 주세요.');
+        const zipScan = await scanZipPackage(packageFile);
+        if (!zipScan.safe) {
+          throw buildSecurityScanError(zipScan.matches);
+        }
+
+        const packageUrl = await uploadPackageFile(packageFile, uid);
+        const extensionId = await addExtensionPack({
+          name,
+          category,
+          desc,
+          price,
+          packType: 'package',
+          packageUrl,
+          entryPoint: normalizedEntryPoint,
+          fileName: packageFile.name,
+          author,
+          authorUid: uid,
+        });
+        return { id: extensionId, storageMode: 'package', packType: 'package' };
       }
 
-      // 2) Storage는 선택 사항 — CORS/미설정 시 6초 내 실패 후 인라인 저장
+      let resolvedCodeBody = String(codeBody || '').trim();
+      let fileName = 'extension.py';
+
+      if (file) {
+        if (!file.name?.toLowerCase().endsWith('.py')) {
+          throw new Error('.py 파일만 업로드할 수 있습니다.');
+        }
+        if (file.size > MAX_SCRIPT_BYTES) {
+          throw new Error('스크립트 파일은 5MB 이하여야 합니다.');
+        }
+        fileName = file.name || fileName;
+        resolvedCodeBody = await readFileAsText(file);
+      }
+
+      if (!resolvedCodeBody.trim()) {
+        throw new Error('파이썬 코드를 입력하거나 .py 파일을 첨부해 주세요.');
+      }
+      if (resolvedCodeBody.length > 900000) {
+        throw new Error('코드가 너무 깁니다(약 900KB 이하). 패키지(.zip) 업로드를 이용해 주세요.');
+      }
+
+      const codeScan = scanPythonCode(resolvedCodeBody);
+      if (!codeScan.safe) {
+        throw buildSecurityScanError(codeScan.matches);
+      }
+
       let fileUrl = '';
-      try {
-        fileUrl = await uploadExtensionFile(file, uid) || '';
-      } catch (storageErr) {
-        console.error('[FirebaseStore] Storage 업로드 실패:', storageErr);
-        markExtensionStorageSkipped(storageErr?.message);
-        fileUrl = '';
+      if (file) {
+        try {
+          fileUrl = await uploadExtensionFile(file, uid) || '';
+        } catch (storageErr) {
+          console.error('[FirebaseStore] Storage 업로드 실패:', storageErr);
+          markExtensionStorageSkipped(storageErr?.message);
+          fileUrl = '';
+        }
       }
 
       const storageMode = fileUrl ? 'storage' : 'inline';
@@ -919,27 +1109,23 @@
         console.info('[FirebaseStore] Firestore 인라인(code_body) 저장으로 진행합니다.');
       }
 
-      let extensionId = '';
+      const scriptEntryPoint = normalizedEntryPoint || fileName || 'main.py';
+      const extensionId = await addExtensionPack({
+        name,
+        category,
+        desc,
+        price,
+        packType: 'script',
+        fileUrl,
+        codeBody: resolvedCodeBody,
+        fileName,
+        entryPoint: scriptEntryPoint,
+        storageMode,
+        author,
+        authorUid: uid,
+      });
 
-      try {
-        extensionId = await addExtensionPack({
-          name,
-          category,
-          desc,
-          price,
-          fileUrl,
-          codeBody,
-          fileName,
-          storageMode,
-          author,
-          authorUid: uid,
-        });
-      } catch (firestoreErr) {
-        console.error('[FirebaseStore] Firestore store_toys 저장 실패:', firestoreErr);
-        throw new Error(firestoreErr.message || '확장팩 정보 저장에 실패했습니다.');
-      }
-
-      return { id: extensionId, storageMode };
+      return { id: extensionId, storageMode, packType: 'script' };
     } catch (err) {
       console.error('[FirebaseStore] uploadExtensionPack 실패:', err);
       throw err;
@@ -1174,6 +1360,7 @@
     saveConfig,
     upsertMarketItem,
     deleteMarketItem,
+    deleteStoreToy,
     saveMarketItems,
     updateUser,
     addInquiry,
@@ -1182,6 +1369,8 @@
     updateDevSubmission,
     uploadExtensionPack,
     addExtensionPack,
+    scanPythonCode,
+    scanZipPackage,
     updateStoreToyReview,
     upsertHomeToy,
     deleteHomeToy,

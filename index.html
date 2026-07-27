@@ -36,7 +36,7 @@
     };
   </script>
 
-  <link rel="stylesheet" href="./style.css?v=202607272100" />
+  <link rel="stylesheet" href="./style.css?v=202607272600" />
 </head>
 <body class="font-sans bg-studio-base text-gray-100 overflow-x-hidden" data-build="20260727-landing-cms-v9">
 
@@ -417,17 +417,66 @@
                 <label class="form-label" for="dev-item-price">가격 (DP)</label>
                 <input type="number" id="dev-item-price" class="form-input" placeholder="0" min="0" step="100" value="0" required />
               </div>
-              <div>
-                <label class="form-label" for="dev-item-file">파이썬 스크립트 (.py)</label>
-                <div id="dev-file-drop" class="dev-file-drop">
-                  <input type="file" id="dev-item-file" class="sr-only" accept=".py,text/x-python,application/x-python-code" required />
-                  <div class="dev-file-drop-inner">
-                    <i data-lucide="file-code-2" class="w-8 h-8 text-indigo-400"></i>
-                    <p class="dev-file-drop-text">.py 파일을 드래그하거나 클릭하여 선택</p>
-                    <p id="dev-file-name" class="dev-file-name hidden"></p>
+              <fieldset class="dev-pack-type-field">
+                <legend class="form-label">업로드 방식</legend>
+                <div class="dev-pack-type-tabs" role="radiogroup" aria-label="확장팩 업로드 방식">
+                  <label class="dev-pack-type-option">
+                    <input type="radio" name="dev-pack-type" value="script" class="dev-pack-type-radio" checked />
+                    <span class="dev-pack-type-label">
+                      <i data-lucide="file-code-2" class="w-4 h-4"></i>
+                      단일 스크립트 (.py / 코드 입력)
+                    </span>
+                  </label>
+                  <label class="dev-pack-type-option">
+                    <input type="radio" name="dev-pack-type" value="package" class="dev-pack-type-radio" />
+                    <span class="dev-pack-type-label">
+                      <i data-lucide="archive" class="w-4 h-4"></i>
+                      확장팩 패키지 (.zip)
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+              <div id="dev-panel-script">
+                <div>
+                  <label class="form-label" for="dev-code-body">파이썬 코드 (code_body)</label>
+                  <textarea id="dev-code-body" class="form-input dev-code-textarea font-mono text-sm" placeholder="# run(context) 함수를 구현하세요&#10;def run(context):&#10;    context.log('Hello!')" spellcheck="false"></textarea>
+                  <p class="dev-form-hint">코드를 직접 입력하거나 아래에서 .py 파일을 업로드할 수 있습니다.</p>
+                </div>
+                <div class="mt-3">
+                  <label class="form-label" for="dev-item-file">스크립트 파일 (.py) — 선택</label>
+                  <div id="dev-file-drop" class="dev-file-drop">
+                    <input type="file" id="dev-item-file" class="sr-only" accept=".py,text/x-python,application/x-python-code" />
+                    <div class="dev-file-drop-inner">
+                      <i data-lucide="upload" class="w-8 h-8 text-indigo-400"></i>
+                      <p class="dev-file-drop-text">.py 파일을 드래그하거나 클릭하여 선택</p>
+                      <p id="dev-file-name" class="dev-file-name hidden"></p>
+                    </div>
                   </div>
                 </div>
+                <div class="mt-3">
+                  <label class="form-label" for="dev-script-entry-point">실행 메인 파일명</label>
+                  <input type="text" id="dev-script-entry-point" class="form-input" value="main.py" placeholder="main.py" maxlength="120" />
+                </div>
               </div>
+              <div id="dev-panel-package" class="hidden">
+                <div>
+                  <label class="form-label" for="dev-package-entry-point">실행 메인 파일명 (entry_point)</label>
+                  <input type="text" id="dev-package-entry-point" class="form-input" value="main.py" placeholder="main.py" maxlength="120" required />
+                </div>
+                <div class="mt-3">
+                  <label class="form-label" for="dev-item-zip">확장팩 패키지 (.zip)</label>
+                  <div id="dev-zip-drop" class="dev-file-drop">
+                    <input type="file" id="dev-item-zip" class="sr-only" accept=".zip,application/zip" />
+                    <div class="dev-file-drop-inner">
+                      <i data-lucide="package" class="w-8 h-8 text-indigo-400"></i>
+                      <p class="dev-file-drop-text">UI·이미지·모듈이 포함된 .zip 파일을 업로드</p>
+                      <p id="dev-zip-name" class="dev-file-name hidden"></p>
+                    </div>
+                  </div>
+                  <p class="dev-form-hint">패키지는 Firebase Storage에 저장되며 download URL이 생성됩니다. (최대 50MB)</p>
+                </div>
+              </div>
+              <div id="dev-scan-warning" class="dev-scan-warning hidden" role="alert"></div>
               <button type="submit" id="dev-submit-btn" class="toy-btn-3d toy-btn-3d-sm w-full justify-center" data-default-label="확장팩 업로드">
                 <span id="dev-submit-btn-label">확장팩 업로드</span>
               </button>
@@ -440,10 +489,10 @@
               <ul class="dev-guide-list mt-4">
                 <li><strong>1.</strong> 샘플 <code>.py</code> 파일을 다운로드해 구조를 확인하세요.</li>
                 <li><strong>2.</strong> <code>run(context)</code> 함수에 확장팩 로직을 구현합니다.</li>
-                <li><strong>3.</strong> 왼쪽 폼에서 이름·카테고리·가격을 입력하고 스크립트를 업로드하세요.</li>
+                <li><strong>3.</strong> 단일 <code>.py</code> 스크립트 또는 UI/자원이 포함된 <code>.zip</code> 패키지를 업로드하세요.</li>
                 <li><strong>4.</strong> 관리자 검수 후 토이마켓 확장팩 탭에 노출됩니다.</li>
               </ul>
-              <p class="dev-guide-note">파일 형식: <code>.py</code>만 허용 · 최대 5MB</p>
+              <p class="dev-guide-note">스크립트: <code>.py</code> 또는 코드 입력 (최대 5MB) · 패키지: <code>.zip</code> (최대 50MB)</p>
               <button type="button" id="dev-sample-download" class="toy-btn-3d toy-btn-3d-sm mt-4 w-full justify-center">
                 <i data-lucide="download" class="w-4 h-4"></i>
                 샘플 확장팩 (.py) 다운로드
@@ -950,8 +999,9 @@
 
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="./firebase-store.js?v=202607272300"></script>
-  <script src="./app.js?v=202607272400"></script>
-  <script src="./admin-dashboard.js?v=202607272300"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="./firebase-store.js?v=202607272600"></script>
+  <script src="./app.js?v=202607272600"></script>
+  <script src="./admin-dashboard.js?v=202607272600"></script>
 </body>
 </html>
