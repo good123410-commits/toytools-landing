@@ -327,7 +327,7 @@
     const FS = window.FirebaseStore;
     if (FS?.isReady()) {
       const list = catalogType === 'skin' ? FS.getSkins() : FS.getToys().filter((i) => i.type === catalogType);
-      return list.filter((i) => i.status === 'approved' && i.active !== false);
+      return list.filter((i) => i.status === 'approved' && i.approved !== false && i.active !== false);
     }
     if (catalogType === 'skin') return SKINS;
     if (catalogType === 'game') return MINIGAMES;
@@ -2254,12 +2254,14 @@ def run(context):
 
   function getMyExtensions() {
     if (!currentUser || !window.FirebaseStore) return [];
+    if (typeof window.FirebaseStore.getStoreToysByUid === 'function') {
+      return window.FirebaseStore.getStoreToysByUid(currentUser.uid);
+    }
     if (typeof window.FirebaseStore.getExtensionsByUid === 'function') {
       return window.FirebaseStore.getExtensionsByUid(currentUser.uid);
     }
-    return (window.FirebaseStore.getExtensions() || []).filter(
-      (ext) => ext.authorUid === currentUser.uid
-        || (ext.author && String(ext.author).includes(currentUser.uid))
+    return (window.FirebaseStore.getToys?.() || []).filter(
+      (ext) => ext.type === 'extension' && ext.authorUid === currentUser.uid
     );
   }
 
@@ -2303,19 +2305,22 @@ def run(context):
     });
 
     container.innerHTML = sorted.map((ext) => {
-      const approved = ext.approved === true;
-      const statusClass = approved ? 'dev-ext-status--approved' : 'dev-ext-status--pending';
-      const statusLabel = approved ? '승인 완료' : '승인 대기';
+      const status = ext.status || (ext.approved === true ? 'approved' : 'pending');
+      const statusClass = status === 'approved'
+        ? 'dev-ext-status--approved'
+        : (status === 'rejected' ? 'dev-ext-status--rejected' : 'dev-ext-status--pending');
+      const statusText = status === 'approved' ? '승인 완료' : (status === 'rejected' ? '반려됨' : '승인 대기');
       const cat = DEV_CATEGORY_LABELS[ext.category] || ext.category || '-';
       const price = Number(ext.price) || 0;
       const dateStr = ext.createdAt ? toDisplayDate(ext.createdAt) : '';
+      const descText = ext.description || ext.desc || '';
       return `
         <article class="dev-ext-item">
           <div class="dev-ext-item-head">
             <strong class="dev-ext-item-name">${escapeHtml(ext.name || '이름 없음')}</strong>
-            <span class="dev-ext-status ${statusClass}">${statusLabel}</span>
+            <span class="dev-ext-status ${statusClass}">${statusText}</span>
           </div>
-          <p class="dev-ext-item-desc">${escapeHtml(ext.desc || '')}</p>
+          <p class="dev-ext-item-desc">${escapeHtml(descText)}</p>
           <div class="dev-ext-item-meta">
             <span>${escapeHtml(cat)}</span>
             <span>${price.toLocaleString()} DP</span>
@@ -2415,9 +2420,7 @@ def run(context):
       setDevSubmitLoading(true);
 
       try {
-        const author = userProfile?.nickname
-          ? `${userProfile.nickname} (${currentUser.uid})`
-          : (currentUser.email || currentUser.uid);
+        const author = userProfile?.nickname || currentUser.email || currentUser.uid;
 
         if (!window.FirebaseStore?.uploadExtensionPack) {
           throw new Error('FirebaseStore가 초기화되지 않았습니다.');
@@ -2465,8 +2468,8 @@ def run(context):
     }
 
     const mine = getMyExtensions();
-    const pending = mine.filter((ext) => ext.approved !== true).length;
-    const approved = mine.filter((ext) => ext.approved === true).length;
+    const pending = mine.filter((ext) => ext.status === 'pending' || (ext.approved !== true && ext.status !== 'rejected')).length;
+    const approved = mine.filter((ext) => ext.approved === true || ext.status === 'approved').length;
 
     if (totalEl) totalEl.textContent = String(mine.length);
     if (pendingEl) pendingEl.textContent = String(pending);

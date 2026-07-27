@@ -426,7 +426,7 @@
                 <td><strong>${B.escapeHtml(item.name)}</strong><br><span class="text-xs text-gray-500">${B.escapeHtml((item.desc || '').slice(0, 40))}…</span></td>
                 <td>${typeLabel[item.type] || item.type}</td>
                 <td>${(item.price || 0).toLocaleString()}P</td>
-                <td>${B.escapeHtml(item.creator || '-')}</td>
+                <td>${B.escapeHtml(item.author || item.creator || '-')}</td>
                 <td><span class="sadmin-status sadmin-status-${item.status}">${statusLabel(item.status)}</span></td>
                 <td>
                   <label class="sadmin-toggle" title="활성화/숨기기">
@@ -509,14 +509,19 @@
   async function updateMarketStatus(id, status) {
     const items = getMarketItems();
     const item = items.find((i) => i.id === id);
-    if (item) {
+    if (!item) return;
+    const approved = status === 'approved';
+    if (FS()?.updateStoreToyReview) {
+      await FS().updateStoreToyReview(id, { approved, status });
+    } else {
       item.status = status;
-      if (status === 'approved') item.active = true;
+      item.approved = approved;
+      if (approved) item.active = true;
       if (FS()) await FS().upsertMarketItem(item);
       else await saveMarketItems(items);
-      B.showToast(status === 'approved' ? '승인되었습니다.' : '반려되었습니다.');
-      renderPanel();
     }
+    B.showToast(status === 'approved' ? '승인되었습니다.' : '반려되었습니다.');
+    renderPanel();
   }
 
   function openItemEdit(id) {
@@ -1268,42 +1273,51 @@
     openUserModal(userId);
   }
 
+  function getStoreToyExtensions() {
+    if (FS()?.getToys) {
+      return FS().getToys().filter((t) => t.type === 'extension');
+    }
+    return getMarketItems().filter((t) => t.type === 'extension');
+  }
+
   // ── Developers & Payouts ──
   function renderDevelopers(el) {
-    const subs = getDevSubmissions();
+    const extensions = getStoreToyExtensions();
+    const pendingExtensions = extensions.filter((t) => t.status === 'pending' || (t.approved !== true && t.status !== 'rejected'));
     const payouts = getPayouts().filter((p) => payoutFilter === 'all' || p.status === payoutFilter);
 
     el.innerHTML = `
       <div class="sadmin-page-head">
         <h1 class="sadmin-page-title">개발자센터 / 정산 관리</h1>
-        <p class="sadmin-page-desc">크리에이터 신청 검수 및 코인 정산 처리</p>
+        <p class="sadmin-page-desc">store_toys 확장팩 검수 및 코인 정산 처리 (실시간)</p>
       </div>
       <div class="sadmin-card">
-        <h3 class="sadmin-card-title"><i data-lucide="package" class="w-4 h-4"></i> 크리에이터 등록 신청</h3>
+        <h3 class="sadmin-card-title"><i data-lucide="puzzle" class="w-4 h-4"></i> 확장팩 검수 (store_toys)</h3>
         <div class="sadmin-table-wrap">
           <table class="sadmin-table">
-            <thead><tr><th>유형</th><th>이름</th><th>신청자</th><th>URL</th><th>상태</th><th>관리</th></tr></thead>
+            <thead><tr><th>이름</th><th>카테고리</th><th>가격</th><th>등록자</th><th>상태</th><th>관리</th></tr></thead>
             <tbody>
-              ${subs.length ? subs.map((s) => `
+              ${extensions.length ? extensions.map((ext) => `
                 <tr>
-                  <td>${B.escapeHtml(s.type || '-')}</td>
-                  <td>${B.escapeHtml(s.name)}</td>
-                  <td>${B.escapeHtml(s.nick || s.email || '-')}</td>
-                  <td class="text-xs truncate max-w-[120px]">${B.escapeHtml(s.url || '-')}</td>
-                  <td><span class="sadmin-status sadmin-status-${s.status || 'pending'}">${statusLabel(s.status || 'pending')}</span></td>
+                  <td><strong>${B.escapeHtml(ext.name)}</strong><br><span class="text-xs text-gray-500">${B.escapeHtml((ext.description || ext.desc || '').slice(0, 50))}</span></td>
+                  <td>${B.escapeHtml(ext.category || '-')}</td>
+                  <td>${(ext.price || 0).toLocaleString()}P</td>
+                  <td>${B.escapeHtml(ext.author || ext.creator || '-')}</td>
+                  <td><span class="sadmin-status sadmin-status-${ext.status || 'pending'}">${statusLabel(ext.status || 'pending')}</span></td>
                   <td>
                     <div class="sadmin-actions">
-                      ${(s.status || 'pending') === 'pending' ? `
-                        <button type="button" class="sadmin-btn sadmin-btn-primary" data-approve-sub="${s.id}">승인</button>
-                        <button type="button" class="sadmin-btn" data-reject-sub="${s.id}">반려</button>
+                      ${(ext.status === 'pending' || ext.approved !== true) && ext.status !== 'rejected' ? `
+                        <button type="button" class="sadmin-btn sadmin-btn-primary" data-approve-ext="${B.escapeHtml(ext.id)}">승인</button>
+                        <button type="button" class="sadmin-btn" data-reject-ext="${B.escapeHtml(ext.id)}">반려</button>
                       ` : '-'}
                     </div>
                   </td>
                 </tr>
-              `).join('') : '<tr><td colspan="6" class="sadmin-empty">신청 내역이 없습니다.</td></tr>'}
+              `).join('') : '<tr><td colspan="6" class="sadmin-empty">등록된 확장팩이 없습니다.</td></tr>'}
             </tbody>
           </table>
         </div>
+        ${pendingExtensions.length ? `<p class="text-xs text-amber-400 mt-2">승인 대기 ${pendingExtensions.length}건</p>` : ''}
       </div>
       <div class="sadmin-subtabs">
         <button type="button" class="sadmin-subtab${payoutFilter === 'pending' ? ' active' : ''}" data-pf="pending">대기</button>
@@ -1344,11 +1358,16 @@
     el.querySelectorAll('[data-pf]').forEach((btn) => {
       btn.addEventListener('click', () => { payoutFilter = btn.dataset.pf; renderDevelopers(el); });
     });
-    el.querySelectorAll('[data-approve-sub]').forEach((btn) => {
-      btn.addEventListener('click', () => updateSubmission(btn.dataset.approveSub, 'approved'));
+    el.querySelectorAll('[data-approve-ext]').forEach((btn) => {
+      btn.addEventListener('click', () => updateMarketStatus(btn.dataset.approveExt, 'approved'));
     });
-    el.querySelectorAll('[data-reject-sub]').forEach((btn) => {
-      btn.addEventListener('click', () => updateSubmission(btn.dataset.rejectSub, 'rejected'));
+    el.querySelectorAll('[data-reject-ext]').forEach((btn) => {
+      btn.addEventListener('click', () => confirmAction({
+        title: '확장팩 반려',
+        message: '이 확장팩을 반려 처리합니다.',
+        danger: true,
+        onConfirm: () => updateMarketStatus(btn.dataset.rejectExt, 'rejected'),
+      }));
     });
     el.querySelectorAll('[data-approve-pay]').forEach((btn) => {
       btn.addEventListener('click', () => updatePayout(btn.dataset.approvePay, 'approved'));

@@ -121,9 +121,10 @@
   }
 
   function normalizeToyType(data) {
-    const raw = String(pick(data, 'type', 'itemType', 'category', 'toyType') || '').toLowerCase();
+    const raw = String(pick(data, 'type', 'itemType', 'toyType') || '').toLowerCase();
     if (raw.includes('extension') || raw.includes('확장')) return 'extension';
     if (raw.includes('game') || raw.includes('mini') || raw.includes('미니')) return 'game';
+    if (pick(data, 'code_body', 'codeBody')) return 'extension';
     return 'game';
   }
 
@@ -149,23 +150,38 @@
 
   function mapToy(id, data) {
     const type = normalizeToyType(data);
+    const approved = data.approved === true;
+    const status = pick(data, 'status') || (approved ? 'approved' : 'pending');
     return {
       id,
       _collection: COL.toys,
       type,
       name: pick(data, 'name', 'title') || '토이',
       desc: pick(data, 'desc', 'description') || '',
+      description: pick(data, 'description', 'desc') || '',
       price: Number(pick(data, 'price', 'point', 'points', 'cost') || 0),
+      category: pick(data, 'category', 'tag', 'label') || '',
       emoji: pick(data, 'emoji', 'icon') || '📦',
       bg: pick(data, 'bg', 'background', 'backgroundGradient', 'thumbnailBg') || DEFAULT_BG,
       tag: pick(data, 'tag', 'gen', 'category', 'label') || (type === 'extension' ? 'Extension' : 'Mini Game'),
       gen: pick(data, 'gen', 'tag', 'category', 'label') || '',
-      status: pick(data, 'status') || 'approved',
+      status,
+      approved,
       active: data.active !== false && data.enabled !== false && data.isActive !== false,
+      author: pick(data, 'author', 'creator', 'createdBy') || 'ToyTools',
+      authorUid: pick(data, 'authorUid', 'authorId', 'uid') || '',
+      code_body: pick(data, 'code_body', 'codeBody', 'content') || '',
+      fileUrl: pick(data, 'fileUrl', 'downloadUrl', 'url') || '',
+      fileName: pick(data, 'fileName', 'filename') || '',
       creator: pick(data, 'creator', 'author', 'createdBy') || 'ToyTools',
       submittedAt: data.submittedAt || data.createdAt || null,
+      createdAt: data.createdAt || null,
       _raw: data,
     };
+  }
+
+  function getExtensionItems() {
+    return cache.toys.filter((t) => t.type === 'extension');
   }
 
   function mergeMarketCache() {
@@ -274,19 +290,28 @@
 
   function toyToFirestore(item) {
     const raw = item._raw || {};
+    const status = item.status || raw.status || (item.approved ? 'approved' : 'pending');
     return {
       ...raw,
       name: item.name,
-      desc: item.desc,
+      desc: item.desc || item.description,
+      description: item.description || item.desc || '',
       price: item.price,
       emoji: item.emoji,
       bg: item.bg,
       type: item.type,
       itemType: item.type,
-      tag: item.tag || item.gen,
-      status: item.status || 'approved',
+      category: item.category || item.tag || raw.category || '',
+      tag: item.tag || item.gen || item.category,
+      status,
+      approved: item.approved === true || status === 'approved',
       active: item.active !== false,
-      creator: item.creator || 'ToyTools',
+      author: item.author || item.creator || raw.author || 'ToyTools',
+      authorUid: item.authorUid || raw.authorUid || '',
+      code_body: item.code_body || raw.code_body || '',
+      fileUrl: item.fileUrl || raw.fileUrl || '',
+      fileName: item.fileName || raw.fileName || '',
+      creator: item.creator || item.author || 'ToyTools',
       submittedAt: item.submittedAt || raw.submittedAt || Date.now(),
     };
   }
@@ -343,7 +368,6 @@
     if (!lsLoad(LS.users, null)) lsSave(LS.users, cache.users);
 
     cache.inquiries = lsLoad(LS.inquiries, []);
-    cache.extensions = lsLoad(LS.extensions, []);
     cache.payouts = lsLoad(LS.payouts, null) || [
       { id: 'pay1', nick: '스킨마스터', email: 'creator@toy-tools.com', amount: 50000, coins: 50000, status: 'pending', requestedAt: '2026-07-25' },
     ];
@@ -508,10 +532,6 @@
       }),
       db.collection('dev_submissions').onSnapshot((snap) => {
         cache.devSubmissions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        notify();
-      }),
-      db.collection('extensions').onSnapshot((snap) => {
-        cache.extensions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         notify();
       }),
       db.collection('payouts').onSnapshot((snap) => {
@@ -798,63 +818,69 @@
     }
   }
 
-  async function saveExtensionInlineFallback({ name, category, desc, price, fileUrl, codeBody, fileName, author, authorUid, extensionId }) {
-    const firestore = getFirestore();
-    if (!canWriteFirestore() || !codeBody) return;
-    try {
-      await firestore.collection('market_items').add({
-        name,
-        desc,
-        price: Number(price) || 0,
-        category,
-        type: 'extension',
-        content: codeBody,
-        code_body: codeBody,
-        fileUrl: fileUrl || '',
-        fileName: fileName || '',
-        author,
-        authorUid: authorUid || '',
-        extensionId: extensionId || '',
-        storageMode: fileUrl ? 'storage' : 'inline',
-        approved: false,
-        createdAt: fs ? fs.FieldValue.serverTimestamp() : Date.now(),
-      });
-    } catch (err) {
-      console.error('[FirebaseStore] market_items 인라인 fallback 저장 실패:', err);
-    }
-  }
-
   async function addExtensionPack(data) {
     try {
       const item = {
-        name: data.name,
-        desc: data.desc,
+        name: data.name || '',
+        category: data.category || '',
+        description: data.desc || data.description || '',
         price: Number(data.price) || 0,
-        category: data.category,
-        fileUrl: data.fileUrl || '',
-        fileName: data.fileName || '',
         code_body: data.codeBody || '',
-        content: data.codeBody || '',
-        storageMode: data.storageMode || (data.fileUrl ? 'storage' : 'inline'),
+        approved: false,
+        status: 'pending',
         author: data.author || '',
         authorUid: data.authorUid || '',
-        approved: false,
+        type: 'extension',
+        itemType: 'extension',
+        active: false,
+        emoji: '🧩',
+        tag: data.category || 'extension',
         createdAt: ready && fs ? fs.FieldValue.serverTimestamp() : Date.now(),
       };
+      if (data.fileUrl) item.fileUrl = data.fileUrl;
+      if (data.fileName) item.fileName = data.fileName;
+
       if (canWriteFirestore()) {
-        const docRef = await getFirestore().collection('extensions').add(item);
+        const docRef = await getFirestore().collection(COL.toys).add(item);
+        const mapped = mapToy(docRef.id, item);
+        cache.toys.push(mapped);
+        mergeMarketCache();
         notify();
         return docRef.id;
       }
       const id = 'ext_' + Date.now();
-      cache.extensions.unshift({ ...item, id });
-      lsSave(LS.extensions, cache.extensions);
+      const mapped = mapToy(id, item);
+      cache.toys.push(mapped);
+      mergeMarketCache();
+      lsSave(LS.market, cache.market);
       notify();
       return id;
     } catch (err) {
       console.error('[FirebaseStore] addExtensionPack 실패:', err);
       throw err;
     }
+  }
+
+  async function updateStoreToyReview(id, { approved, status }) {
+    const nextStatus = status || (approved ? 'approved' : 'rejected');
+    const patch = {
+      approved: approved === true,
+      status: nextStatus,
+      active: approved === true,
+      updatedAt: fs ? fs.FieldValue.serverTimestamp() : Date.now(),
+    };
+    const idx = cache.toys.findIndex((t) => t.id === id);
+    if (idx >= 0) {
+      const merged = { ...cache.toys[idx]._raw, ...cache.toys[idx], ...patch };
+      cache.toys[idx] = mapToy(id, merged);
+      mergeMarketCache();
+    }
+    if (canWriteFirestore()) {
+      await getFirestore().collection(COL.toys).doc(id).update(patch);
+    } else {
+      lsSave(LS.market, cache.market);
+    }
+    notify();
   }
 
   async function uploadExtensionPack({ name, category, desc, price, file, author, uid }) {
@@ -909,14 +935,8 @@
           authorUid: uid,
         });
       } catch (firestoreErr) {
-        console.error('[FirebaseStore] Firestore extensions 저장 실패:', firestoreErr);
+        console.error('[FirebaseStore] Firestore store_toys 저장 실패:', firestoreErr);
         throw new Error(firestoreErr.message || '확장팩 정보 저장에 실패했습니다.');
-      }
-
-      if (storageMode === 'inline' && codeBody) {
-        await saveExtensionInlineFallback({
-          name, category, desc, price, fileUrl, codeBody, fileName, author, authorUid: uid, extensionId,
-        });
       }
 
       return { id: extensionId, storageMode };
@@ -928,9 +948,11 @@
 
   function getExtensionsByUid(uid) {
     if (!uid) return [];
-    return cache.extensions.filter(
-      (ext) => ext.authorUid === uid || (ext.author && String(ext.author).includes(uid))
-    );
+    return getExtensionItems().filter((ext) => ext.authorUid === uid);
+  }
+
+  function getStoreToysByUid(uid) {
+    return getExtensionsByUid(uid);
   }
 
   async function updateDevSubmission(id, data) {
@@ -1133,8 +1155,9 @@
     getInquiries: () => cache.inquiries,
     getPayouts: () => cache.payouts,
     getDevSubmissions: () => cache.devSubmissions,
-    getExtensions: () => cache.extensions,
+    getExtensions: () => getExtensionItems(),
     getExtensionsByUid,
+    getStoreToysByUid,
     getHomeToys: () => cache.homeToys,
     getDevlogs: () => cache.devlogs,
     getSettings: () => cache.settings,
@@ -1159,6 +1182,7 @@
     updateDevSubmission,
     uploadExtensionPack,
     addExtensionPack,
+    updateStoreToyReview,
     upsertHomeToy,
     deleteHomeToy,
     upsertDevlog,
